@@ -27,6 +27,9 @@ public final class Prefs {
     public static final String KEY_KEYWORDS = "custom_keywords";
     public static final String KEY_APP_SHORT = "app_short";
     public static final String KEY_APP_COMIC = "app_comic";
+    /** 广告卡住时自动切后台再回来。 */
+    public static final String KEY_ESCAPE = "escape_enabled";
+    public static final String KEY_ESCAPE_AFTER = "escape_after_ms";
 
     public static final int DEFAULT_SWIPE_DURATION = 450;
     public static final int DEFAULT_SWIPE_FROM = 78;
@@ -34,6 +37,7 @@ public final class Prefs {
     public static final int DEFAULT_CHECK_INTERVAL = 700;
     public static final int DEFAULT_COOLDOWN = 2500;
     public static final int DEFAULT_PERSIST = 1200;
+    public static final int DEFAULT_ESCAPE_AFTER = 15000;
 
     private Prefs() {
     }
@@ -51,6 +55,8 @@ public final class Prefs {
         config.swipeFromPct = clamp(prefs.getInt(KEY_SWIPE_FROM, DEFAULT_SWIPE_FROM), 20, 95);
         config.swipeToPct = clamp(prefs.getInt(KEY_SWIPE_TO, DEFAULT_SWIPE_TO), 5, 60);
         config.customKeywords = splitKeywords(prefs.getString(KEY_KEYWORDS, ""));
+        config.escapeEnabled = prefs.getBoolean(KEY_ESCAPE, true);
+        config.escapeAfterMs = clamp(prefs.getInt(KEY_ESCAPE_AFTER, DEFAULT_ESCAPE_AFTER), 5000, 60000);
         return config;
     }
 
@@ -91,3 +97,4 @@ public final class Prefs {
         return value < min ? min : (value > max ? max : value);
     }
 }
+

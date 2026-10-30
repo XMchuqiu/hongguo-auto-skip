@@ -106,20 +106,54 @@ public class AdStateMachineTest {
     public void continuePromptAfterCountdownGoneSwipes() {
         DetectorConfig config = DetectorConfig.defaults();
         config.cooldownMs = 500;
+        config.endCardConfirmMs = 600;
         AdStateMachine sm = new AdStateMachine(config);
 
         assertFalse(sm.onScan(adWithPrompt(21), 0).isAction());
         assertFalse(sm.onScan(adWithPrompt(20), 1000).isAction());
-        // 倒计时消失 = 广告播完，切到结束卡片
-        assertTrue(sm.onScan(endCard(), 2200).swipe);
+        // 倒计时消失 = 广告播完切结束卡片，但要连续一段时间没有倒计时才动手
+        assertFalse(sm.onScan(endCard(), 2200).isAction());
+        assertTrue(sm.onScan(endCard(), 2900).swipe);
     }
 
     @Test
-    public void endCardWithoutCountdownSwipesImmediately() {
+    public void endCardNeedsStableNoCountdown() {
         DetectorConfig config = DetectorConfig.defaults();
         config.cooldownMs = 0;
+        config.endCardConfirmMs = 600;
         AdStateMachine sm = new AdStateMachine(config);
-        assertTrue(sm.onScan(endCard(), 0).swipe);
+        assertFalse(sm.onScan(endCard(), 0).isAction());
+        assertTrue(sm.onScan(endCard(), 700).swipe);
+    }
+
+    @Test
+    public void escapesWhenAdNeverEnds() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.cooldownMs = 500;
+        config.escapeAfterMs = 5000;
+        config.escapeEnabled = true;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(ad(60), 0).isAction());
+        assertFalse(sm.onScan(ad(58), 2000).isAction());
+        assertFalse(sm.onScan(ad(56), 4000).isAction());
+        AdStateMachine.Action action = sm.onScan(ad(54), 6000);
+        assertTrue(action.escape);
+        assertFalse(action.swipe);
+        // 一次广告只切一次后台
+        assertFalse(sm.onScan(ad(52), 20000).escape);
+    }
+
+    @Test
+    public void escapeCanBeDisabled() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.escapeAfterMs = 1000;
+        config.escapeEnabled = false;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(ad(60), 0).isAction());
+        assertFalse(sm.onScan(ad(50), 5000).isAction());
+        assertFalse(sm.onScan(ad(40), 9000).isAction());
     }
 
     @Test
@@ -218,3 +252,4 @@ public class AdStateMachineTest {
         assertTrue(sm.onScan(ad(null), 1600).swipe);
     }
 }
+

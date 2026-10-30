@@ -118,16 +118,37 @@ public final class NodeScanner {
             }
         } catch (Throwable ignored) {
         }
-        if (list.isEmpty()) {
-            try {
-                AccessibilityNodeInfo root = service.getRootInActiveWindow();
-                if (root != null) {
-                    list.add(new RawWindow(asString(root.getPackageName()), 0, true, root));
+        // 关键：有些 ROM / 广告窗口不在 getWindows() 里（真机日志出现过只返回状态栏的情况），
+        // 这里补上"当前活动窗口"的根节点，否则会误判成前台不是红果而放弃检测。
+        try {
+            AccessibilityNodeInfo root = service.getRootInActiveWindow();
+            if (root != null) {
+                String pkg = asString(root.getPackageName());
+                boolean present = false;
+                for (RawWindow window : list) {
+                    if (pkg.equals(window.pkg)) {
+                        present = true;
+                        break;
+                    }
                 }
-            } catch (Throwable ignored) {
+                if (!present) {
+                    list.add(new RawWindow(pkg, 0, true, root));
+                }
             }
+        } catch (Throwable ignored) {
         }
         return list;
+    }
+
+    public static int countNodes(UiNode node) {
+        if (node == null) {
+            return 0;
+        }
+        int count = 1;
+        for (int i = 0; i < node.children.size(); i++) {
+            count += countNodes(node.children.get(i));
+        }
+        return count;
     }
 
     public static List<WindowInfo> snapshot(List<RawWindow> rawWindows) {
@@ -184,3 +205,4 @@ public final class NodeScanner {
         return cs == null ? "" : cs.toString();
     }
 }
+

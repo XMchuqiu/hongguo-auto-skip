@@ -15,6 +15,10 @@ public final class ServiceState {
     public static volatile String lastSwipeReason = "";
     public static volatile int scanCount;
     public static volatile String lastDumpPath = "";
+    public static volatile long lastDumpAt;
+    public static volatile int lastDumpWindows;
+    public static volatile int lastDumpNodes;
+    public static volatile int lastDumpLines;
 
     /** 抓取请求的到期时间（毫秒时间戳），0 表示没有待处理请求。 */
     private static volatile long dumpDueAt;
@@ -67,6 +71,11 @@ public final class ServiceState {
         lastSwipeAt = 0;
         lastSwipeReason = "";
         scanCount = 0;
+        lastDumpAt = 0;
+        lastDumpWindows = 0;
+        lastDumpNodes = 0;
+        lastDumpLines = 0;
         dumpDueAt = 0;
     }
 }
+

@@ -17,6 +17,12 @@ public final class DetectorConfig {
     public int persistSwipeMs = 1200;
     /** 广告标识至少出现这么久，才允许"广告消失后上滑"，避免闪现误触。 */
     public int minAdDurationMs = 800;
+    /** "上滑继续观看"要连续这么多毫秒都没有倒计时，才当作广告结束卡片（防止倒计时偶尔不渲染导致误判）。 */
+    public int endCardConfirmMs = 600;
+    /** 广告超过这么久还跳不过去，就切后台再回来（红果会在回到前台时丢掉广告）。 */
+    public int escapeAfterMs = 15000;
+    /** 是否允许自动切后台再回来。 */
+    public boolean escapeEnabled = true;
     /** 上滑之后的静默期，避免一次广告连滑好几次。 */
     public int postSwipeQuietMs = 4000;
     /** 同一段广告最多上滑几次。 */
@@ -49,6 +55,9 @@ public final class DetectorConfig {
         c.cooldownMs = cooldownMs;
         c.persistSwipeMs = persistSwipeMs;
         c.minAdDurationMs = minAdDurationMs;
+        c.endCardConfirmMs = endCardConfirmMs;
+        c.escapeAfterMs = escapeAfterMs;
+        c.escapeEnabled = escapeEnabled;
         c.postSwipeQuietMs = postSwipeQuietMs;
         c.maxSwipesPerAd = maxSwipesPerAd;
         c.stuckAdMs = stuckAdMs;
@@ -64,7 +73,8 @@ public final class DetectorConfig {
     /** 参数指纹，用于判断是否需要重建状态机。 */
     public String signature() {
         return checkIntervalMs + "|" + cooldownMs + "|" + persistSwipeMs + "|" + minAdDurationMs + "|"
-                + postSwipeQuietMs + "|" + maxSwipesPerAd + "|" + stuckAdMs + "|"
+                + postSwipeQuietMs + "|" + maxSwipesPerAd + "|" + stuckAdMs + "|" + endCardConfirmMs + "|" + escapeAfterMs + "|" + escapeEnabled + "|"
                 + swipeOnAdEnd + "|" + swipeOnPersist + "|" + customKeywords.hashCode();
     }
 }
+

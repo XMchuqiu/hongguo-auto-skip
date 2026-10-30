@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
     private Switch appShortSwitch;
     private Switch appComicSwitch;
     private Switch debugSwitch;
+    private Switch escapeSwitch;
     private EditText keywordInput;
     private SeekBar seekSwipeDuration;
     private SeekBar seekSwipeFrom;
@@ -105,6 +106,7 @@ public class MainActivity extends Activity {
         appShortSwitch = findViewById(R.id.app_short_switch);
         appComicSwitch = findViewById(R.id.app_comic_switch);
         debugSwitch = findViewById(R.id.debug_switch);
+        escapeSwitch = findViewById(R.id.escape_switch);
         keywordInput = findViewById(R.id.keyword_input);
 
         seekSwipeDuration = findViewById(R.id.seek_swipe_duration);
@@ -308,6 +310,14 @@ public class MainActivity extends Activity {
                 prefs.edit().putBoolean(Prefs.KEY_APP_COMIC, isChecked).apply();
             }
         });
+        escapeSwitch.setChecked(prefs.getBoolean(Prefs.KEY_ESCAPE, true));
+        escapeSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs.edit().putBoolean(Prefs.KEY_ESCAPE, isChecked).apply();
+                toast(isChecked ? "广告卡住时会自动切后台再回来" : "已关闭自动切后台");
+            }
+        });
         debugSwitch.setChecked(prefs.getBoolean(Prefs.KEY_DEBUG, false));
         debugSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -465,6 +475,15 @@ public class MainActivity extends Activity {
         if (ServiceState.lastSwipeAt > 0) {
             String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date(ServiceState.lastSwipeAt));
             sb.append('\n').append("最近动作：").append(time).append(" · ").append(ServiceState.lastSwipeReason);
+        }
+        long dumpDueIn = ServiceState.dumpDueInMs();
+        if (dumpDueIn >= 0) {
+            sb.append('\n').append("抓取节点：等待中，约 ").append((dumpDueIn + 999) / 1000).append(" 秒后执行（记得切回广告页）");
+        } else if (ServiceState.lastDumpAt > 0) {
+            String dumpTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date(ServiceState.lastDumpAt));
+            sb.append('\n').append("最近抓取：").append(dumpTime)
+                    .append(" · ").append(ServiceState.lastDumpWindows).append(" 个窗口 / ")
+                    .append(ServiceState.lastDumpNodes).append(" 个节点");
         }
         sb.append('\n').append("已安装：").append(installedLabel(HongguoAccessibilityService.PKG_SHORT_DRAMA, "红果免费短剧"))
                 .append(" / ").append(installedLabel(HongguoAccessibilityService.PKG_COMIC, "红果免费漫剧"));
@@ -673,4 +692,5 @@ public class MainActivity extends Activity {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }
+
 

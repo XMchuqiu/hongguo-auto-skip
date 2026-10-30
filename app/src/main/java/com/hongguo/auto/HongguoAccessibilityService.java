@@ -281,6 +281,9 @@ public class HongguoAccessibilityService extends AccessibilityService {
         } else if (action.tap) {
             ServiceState.lastDecision = "点击跳过 · " + action.reason + " · " + signals.describe();
             performTap(action.bounds, foreground, action.reason);
+        } else if (action.escape) {
+            ServiceState.lastDecision = "切后台 · " + action.reason + " · " + signals.describe();
+            performEscape(foreground, action.reason);
         }
     }
 
@@ -356,15 +359,19 @@ public class HongguoAccessibilityService extends AccessibilityService {
         int fromPct = config.swipeFromPct;
         int toPct = config.swipeToPct;
         int duration = config.swipeDurationMs;
+        // 广告结束卡片里，中间常常是广告的落地页按钮/WebView，会吃掉手势导致滑不动。
+        // 第二次改从底部提示条附近起手，第三次改从视频区中部起手，覆盖不同实现。
         if (variant == 1) {
-            fromPct = Math.min(95, fromPct + 8);
-            toPct = Math.max(5, toPct - 10);
-            duration = Math.max(600, (int) (duration * 1.6f));
+            fromPct = 92;
+            toPct = 38;
+            duration = Math.max(500, duration);
         } else if (variant >= 2) {
-            fromPct = Math.min(97, fromPct + 12);
-            toPct = Math.max(3, toPct - 15);
-            duration = Math.max(800, duration * 2);
+            fromPct = 50;
+            toPct = 8;
+            duration = Math.max(700, (int) (duration * 1.5f));
         }
+        fromPct = Math.max(5, Math.min(95, fromPct));
+        toPct = Math.max(2, Math.min(90, toPct));
 
         int height = bottom - top;
         float x = (left + right) / 2f;
@@ -479,6 +486,47 @@ public class HongguoAccessibilityService extends AccessibilityService {
         return new int[]{left, top, right, bottom};
     }
 
+    /**
+     * 广告怎么都过不去时的兜底：回桌面，再重新打开红果。
+     * 真机上验证过：红果回到前台时会丢掉广告直接继续剧情。
+     */
+    private void performEscape(final String pkg, String reason) {
+        ServiceState.lastSwipeAt = System.currentTimeMillis();
+        ServiceState.lastSwipeReason = "切后台: " + reason;
+        AppLog.d(TAG, "切后台: pkg=" + pkg + " 原因=" + reason);
+        try {
+            boolean ok = performGlobalAction(GLOBAL_ACTION_HOME);
+            AppLog.d(TAG, "回到桌面: " + ok);
+        } catch (Throwable t) {
+            AppLog.d(TAG, "回到桌面失败: " + t);
+        }
+        Handler handler = worker;
+        if (handler == null) {
+            return;
+        }
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Intent launch = getPackageManager().getLaunchIntentForPackage(pkg);
+                    if (launch == null) {
+                        AppLog.d(TAG, "找不到启动入口: " + pkg);
+                        toastOnMain("无法自动打开红果，请手动切回");
+                        return;
+                    }
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                            | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    startActivity(launch);
+                    AppLog.d(TAG, "已重新打开 " + pkg);
+                } catch (Throwable t) {
+                    AppLog.d(TAG, "自动切回失败（系统限制后台启动）: " + t);
+                    toastOnMain("无法自动切回红果，请手动切回");
+                }
+            }
+        }, 900);
+    }
+
     /** 手势被 ROM 拒绝时的兜底：直接让容器滚动一屏。 */
     private final Runnable fallbackScroll = new Runnable() {
         @Override
@@ -511,7 +559,15 @@ public class HongguoAccessibilityService extends AccessibilityService {
     /** 用户点"抓取当前页面"时，把所有窗口节点导出到日志和文件，方便反馈问题。 */
     private void dumpCurrentScreen() {
         try {
-            List<NodeScanner.WindowInfo> windows = NodeScanner.snapshot(NodeScanner.collectRawWindows(this));
+            List<NodeScanner.RawWindow> raw = NodeScanner.collectRawWindows(this);
+            List<NodeScanner.WindowInfo> windows = NodeScanner.snapshot(raw);
+            StringBuilder head = new StringBuilder();
+            head.append("窗口数=").append(windows.size()).append(" 前台=").append(ServiceState.foregroundPackage);
+            for (NodeScanner.WindowInfo w : windows) {
+                head.append(" [").append(w.pkg).append(w.active ? "/active" : "").append("]");
+            }
+            AppLog.d(TAG, "抓取: " + head);
+
             String dump = NodeScanner.dumpWindows(this, windows);
             String[] lines = dump.split("\n");
             AppLog.d(TAG, "===== 页面节点开始 =====");
@@ -524,6 +580,11 @@ public class HongguoAccessibilityService extends AccessibilityService {
             }
             AppLog.d(TAG, "===== 页面节点结束 =====");
 
+            int nodeCount = 0;
+            for (NodeScanner.WindowInfo w : windows) {
+                nodeCount += NodeScanner.countNodes(w.root);
+            }
+            String path = "";
             File dir = getExternalFilesDir("dumps");
             if (dir != null) {
                 if (!dir.exists()) {
@@ -534,11 +595,36 @@ public class HongguoAccessibilityService extends AccessibilityService {
                 FileOutputStream out = new FileOutputStream(file);
                 out.write(dump.getBytes("UTF-8"));
                 out.close();
-                ServiceState.lastDumpPath = file.getAbsolutePath();
-                AppLog.d(TAG, "节点已保存: " + file.getAbsolutePath());
+                path = file.getAbsolutePath();
+                ServiceState.lastDumpPath = path;
+                AppLog.d(TAG, "节点已保存: " + path);
             }
+            ServiceState.lastDumpAt = System.currentTimeMillis();
+            ServiceState.lastDumpWindows = windows.size();
+            ServiceState.lastDumpNodes = nodeCount;
+            ServiceState.lastDumpLines = lines.length;
+            toastOnMain("已抓取 " + windows.size() + " 个窗口 / " + nodeCount + " 个节点"
+                    + (path.isEmpty() ? "" : "，已保存"));
+            AppLog.d(TAG, "抓取完成: 窗口=" + windows.size() + " 节点=" + nodeCount + " 行=" + lines.length);
         } catch (Throwable t) {
             AppLog.d(TAG, "抓取节点失败: " + t);
+            toastOnMain("抓取失败: " + t);
+        }
+    }
+
+    /** 从工作线程 Toast 到主线程。 */
+    private void toastOnMain(final String message) {
+        try {
+            new Handler(getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Toast.makeText(HongguoAccessibilityService.this, message, Toast.LENGTH_LONG).show();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
         }
     }
 
@@ -634,4 +720,6 @@ public class HongguoAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
+
 

@@ -1,44 +1,43 @@
 package com.hongguo.auto.core;
 
 /**
- * 广告状态机：把"每次扫描的结果"翻译成"要不要点一下 / 上滑"。
+ * 广告状态机：把"每次扫描的结果"翻译成"要不要点一下 / 上滑 / 切后台再回来"。
  *
  * <p>触发顺序（都受冷却、次数、滑后静默约束）：
  * <ol>
- *   <li>有明确的"跳过广告/关闭广告"按钮 → 直接点掉（最省事，也最像人工操作）；</li>
+ *   <li>有明确的"跳过广告/关闭广告"按钮 → 直接点掉；</li>
  *   <li>倒计时归零 → 上滑；</li>
- *   <li>出现"上滑继续看短剧"且页面上没有正在走的倒计时 → 说明到了广告结束卡片，上滑；</li>
+ *   <li>"上滑继续看短剧"且**连续一段时间**没有倒计时 → 广告结束卡片，上滑；</li>
  *   <li>广告角标持续存在且倒计时不再变化 → 上滑；</li>
  *   <li>广告长时间卡住 → 上滑兜底；</li>
- *   <li>之前处于广告界面，这次广告特征整体消失 → 上滑。</li>
+ *   <li>广告播了很久、没有跳过按钮、怎么都过不去 → 切后台再回来（红果回到前台会丢掉广告）。</li>
  * </ol>
- *
- * <p>关键修正：旧逻辑把"上滑继续看短剧"直接当成广告结束，但红果在**广告播放期间**
- * 也会一直显示这行提示，于是提前上滑、白滑一次，广告照样播完。
  */
 public final class AdStateMachine {
 
     public static final class Action {
-        public static final Action NONE = new Action(false, false, "", 0, null);
+        public static final Action NONE = new Action(false, false, false, "", 0, null);
 
         public final boolean swipe;
         public final boolean tap;
+        public final boolean escape;
         public final String reason;
-        /** 上滑力度档位 0/1/2，越大越强力（起点更高、终点更低、更慢）。 */
+        /** 上滑力度档位 0/1/2，越大越强力。 */
         public final int variant;
         /** 点击目标的屏幕坐标 [left, top, right, bottom]，仅 tap 时有值。 */
         public final int[] bounds;
 
-        private Action(boolean swipe, boolean tap, String reason, int variant, int[] bounds) {
+        private Action(boolean swipe, boolean tap, boolean escape, String reason, int variant, int[] bounds) {
             this.swipe = swipe;
             this.tap = tap;
+            this.escape = escape;
             this.reason = reason;
             this.variant = variant;
             this.bounds = bounds;
         }
 
         public boolean isAction() {
-            return swipe || tap;
+            return swipe || tap || escape;
         }
     }
 
@@ -51,6 +50,8 @@ public final class AdStateMachine {
     private int attempts;
     private int swipeVariant;
     private boolean skipTapped;
+    private boolean escaped;
+    private long noCountdownSince = -1;
     private long lastActionMs = Long.MIN_VALUE / 4;
     private long quietUntilMs;
     private long lastAdSeenMs;
@@ -74,6 +75,8 @@ public final class AdStateMachine {
         attempts = 0;
         swipeVariant = 0;
         skipTapped = false;
+        escaped = false;
+        noCountdownSince = -1;
         lastActionMs = Long.MIN_VALUE / 4;
         quietUntilMs = 0;
         lastAdSeenMs = 0;
@@ -99,9 +102,7 @@ public final class AdStateMachine {
 
         if (!ad && inAd && now - lastAdSeenMs > 3000) {
             inAd = false;
-            attempts = 0;
-            swipeVariant = 0;
-            skipTapped = false;
+            resetSession();
         }
 
         if (ad) {
@@ -109,9 +110,7 @@ public final class AdStateMachine {
                 inAd = true;
                 adStartMs = now;
                 if (now - lastActionMs > 3000) {
-                    attempts = 0;
-                    swipeVariant = 0;
-                    skipTapped = false;
+                    resetSession();
                 }
                 lastCountdownChangeMs = now;
                 lastCountdown = signals.countdownValue;
@@ -131,6 +130,12 @@ public final class AdStateMachine {
             }
             lastHadLiveCountdown = liveNow;
 
+            if (liveNow) {
+                noCountdownSince = -1;
+            } else if (noCountdownSince < 0) {
+                noCountdownSince = now;
+            }
+
             // 1) 有明确的跳过/关闭按钮 → 点掉
             if (!skipTapped && signals.canTapSkip() && canAct(now)
                     && (signals.skipButton || signals.adBadge || signals.countdown || signals.cta)) {
@@ -143,14 +148,16 @@ public final class AdStateMachine {
                 return doSwipe(now, "倒计时归零");
             }
 
-            // 3) 广告结束卡片：有"上滑继续看短剧"，且没有正在走的倒计时
-            if (signals.continuePrompt && !signals.hasLiveCountdown() && canAct(now)) {
+            // 3) 结束卡片：有"上滑继续看短剧"，且连续一段时间没有倒计时
+            //    （倒计时偶尔不渲染时不至于误判，等它稳定下来再滑）
+            if (signals.continuePrompt && !liveNow && noCountdownSince >= 0
+                    && now - noCountdownSince >= config.endCardConfirmMs && canAct(now)) {
                 return doSwipe(now, "广告结束卡片（上滑继续）");
             }
 
-            // 4) 广告标识持续存在且倒计时不再变化
+            // 4) 广告角标持续存在且倒计时不再变化
             if (config.swipeOnPersist
-                    && !signals.hasLiveCountdown()
+                    && !liveNow
                     && now - adStartMs >= config.persistSwipeMs
                     && now - lastCountdownChangeMs >= config.persistSwipeMs
                     && canAct(now)) {
@@ -163,10 +170,20 @@ public final class AdStateMachine {
                     && canAct(now)) {
                 return doSwipe(now, "广告卡住 " + (now - adStartMs) + "ms");
             }
+
+            // 6) 长广告、没有跳过按钮、怎么都过不去 → 切后台再回来（用户在真机上验证有效）
+            if (config.escapeEnabled && !escaped && liveNow
+                    && now - adStartMs >= config.escapeAfterMs) {
+                escaped = true;
+                inAd = false;
+                lastActionMs = now;
+                quietUntilMs = now + config.postSwipeQuietMs;
+                return new Action(false, false, true, "广告 " + ((now - adStartMs) / 1000) + "s 仍未结束，切后台再回来", 0, null);
+            }
             return Action.NONE;
         }
 
-        // 6) 广告特征消失
+        // 7) 广告特征消失
         if (inAd) {
             long duration = now - adStartMs;
             inAd = false;
@@ -175,6 +192,14 @@ public final class AdStateMachine {
             }
         }
         return Action.NONE;
+    }
+
+    private void resetSession() {
+        attempts = 0;
+        swipeVariant = 0;
+        skipTapped = false;
+        escaped = false;
+        noCountdownSince = -1;
     }
 
     private boolean canAct(long now) {
@@ -191,12 +216,13 @@ public final class AdStateMachine {
         quietUntilMs = now + config.postSwipeQuietMs;
         inAd = false;
         lastCountdown = null;
-        return new Action(true, false, reason, variant, null);
+        return new Action(true, false, false, reason, variant, null);
     }
 
     private Action doTap(long now, int[] bounds, String reason) {
         lastActionMs = now;
         quietUntilMs = now + config.postSwipeQuietMs;
-        return new Action(false, true, reason, 0, bounds);
+        return new Action(false, true, false, reason, 0, bounds);
     }
 }
+
