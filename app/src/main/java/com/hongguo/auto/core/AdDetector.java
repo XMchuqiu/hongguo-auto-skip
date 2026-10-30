@@ -13,18 +13,27 @@ public final class AdDetector {
 
     /** 广告落地页的行为召唤词。 */
     public static final String[] CTA_KEYWORDS = {
-            "立即下载", "极速下载", "点击下载", "下载游戏", "下载应用", "立即安装", "安装游戏",
-            "去游戏", "点击进入游戏", "进入游戏", "进入直播间", "了解详情", "查看详情",
-            "领取奖励", "看视频得", "商家推荐", "精彩应用", "广告主", "立即体验", "打开应用"
+            "立即下载", "极速下载", "点击下载", "下载游戏", "下载应用", "官方下载", "一键下载",
+            "立即安装", "安装游戏", "下载并安装", "去游戏", "点击进入游戏", "进入游戏",
+            "进入直播间", "了解详情", "查看详情", "立即体验", "领取奖励", "看视频得",
+            "商家推荐", "精彩应用", "广告主", "打开应用", "立即打开", "查看应用"
     };
 
-    /** 需要用户滑一下才能继续的信号。 */
+    /** 需要用户滑一下才能继续的信号（注意：广告播放期间也可能一直显示）。 */
     public static final String[] CONTINUE_PROMPTS = {
             "上滑继续", "继续观看", "滑动继续", "上滑查看", "上滑看下一集", "继续播放下一集", "点击继续"
     };
 
-    /** 跳过广告按钮。 */
-    public static final String[] SKIP_KEYWORDS = {"跳过广告", "跳过此广告", "关闭广告", "跳过"};
+    /** 明确的跳过/关闭广告按钮。 */
+    public static final String[] SKIP_STRICT = {
+            "跳过广告", "跳过此广告", "跳过本广告", "关闭广告", "跳过此片广告", "跳过本轮广告"
+    };
+
+    /** 泛化的跳过/关闭，需要有其它广告特征佐证。 */
+    public static final String[] SKIP_GENERIC = {"跳过", "关闭"};
+
+    /** 这些是"跳过片头/片尾"，不是广告，必须排除。 */
+    private static final String[] SKIP_EXCLUDE = {"片头", "片尾", "开屏"};
 
     private static final String[] AD_BADGE_EXACT = {"广告", "广告中", "广告位", "赞助", "推广"};
 
@@ -41,13 +50,6 @@ public final class AdDetector {
     private AdDetector() {
     }
 
-    /**
-     * 扫描若干窗口根节点。
-     *
-     * @param roots           根节点列表（活动窗口 + 各悬浮窗）
-     * @param config          参数
-     * @param legacyComicRule 是否启用红果免费漫剧的旧特征（集数控件 id=jer 文本为空）
-     */
     public static AdSignals scan(List<UiNode> roots, DetectorConfig config, boolean legacyComicRule) {
         Collector collector = new Collector(config, legacyComicRule);
         if (roots != null) {
@@ -148,7 +150,9 @@ public final class AdDetector {
 
         private boolean adBadge;
         private boolean customHit;
-        private boolean skip;
+        private boolean skipStrict;
+        private boolean skipGeneric;
+        private int[] skipBounds;
         private boolean countdown;
         private Integer countdownValue;
         private boolean ctaSeen;
@@ -191,21 +195,31 @@ public final class AdDetector {
             String text = trim(node.text);
             String desc = trim(node.desc);
             String id = node.viewId == null ? "" : node.viewId.toLowerCase(Locale.ROOT);
+            String merged = text + " " + desc;
 
             if (isAdBadge(text) || isAdBadge(desc)) {
                 adBadge = true;
                 note("角标=" + (text.isEmpty() ? desc : text));
             }
-            if (containsAny(text, SKIP_KEYWORDS) || containsAny(desc, SKIP_KEYWORDS)) {
-                skip = true;
+
+            boolean strict = containsAny(merged, SKIP_STRICT);
+            boolean generic = !strict && containsAny(merged, SKIP_GENERIC) && !containsAny(merged, SKIP_EXCLUDE);
+            if (strict) {
+                skipStrict = true;
                 note("跳过=" + (text.isEmpty() ? desc : text));
+                recordSkipBounds(node);
+            } else if (generic) {
+                skipGeneric = true;
+                recordSkipBounds(node);
             }
+
             if (customKeywords.length > 0) {
                 if (containsAny(text, customKeywords) || containsAny(desc, customKeywords)) {
                     customHit = true;
                     note("自定义词=" + (text.isEmpty() ? desc : text));
                 }
             }
+
             Integer countdown = parseCountdown(text);
             if (countdown == null) {
                 countdown = parseCountdown(desc);
@@ -237,6 +251,22 @@ public final class AdDetector {
             }
         }
 
+        /** 记录跳过按钮的坐标，优先取"按钮本身"（面积最小且不是整屏容器）。 */
+        private void recordSkipBounds(UiNode node) {
+            int area = node.width() * node.height();
+            if (area <= 0 || node.width() > 700 && node.height() > 700) {
+                return;
+            }
+            if (skipBounds == null) {
+                skipBounds = new int[]{node.left, node.top, node.right, node.bottom};
+                return;
+            }
+            int oldArea = (skipBounds[2] - skipBounds[0]) * (skipBounds[3] - skipBounds[1]);
+            if (area < oldArea) {
+                skipBounds = new int[]{node.left, node.top, node.right, node.bottom};
+            }
+        }
+
         private Integer parseBareNumber(String s) {
             if (s == null) {
                 return null;
@@ -261,17 +291,15 @@ public final class AdDetector {
             boolean countdownSeen = countdown;
             Integer value = countdownValue;
             // 只有裸数字时，必须有角标/跳过按钮佐证才认作倒计时
-            if (!countdownSeen && !bareNumbers.isEmpty() && (adBadge || skip)) {
+            if (!countdownSeen && !bareNumbers.isEmpty() && (adBadge || skipStrict || skipGeneric)) {
                 countdownSeen = true;
                 value = bareNumbers.get(0);
             }
-            // 与旧版语义保持一致：max 剧的集数控件存在、但文本里没有"集"→ 广告卡片。
-            // 这里刻意不看页面上其它"第N集"文本，否则会漏掉带长标题的广告页。
+            // 与旧版语义保持一致：漫剧的集数控件存在、但文本里没有"集"→ 广告卡片。
             boolean legacyCard = legacyComicRule && jerFound && !jerText.contains("集");
-            // 自定义关键词=用户明确认为这是广告，按强信号处理
             boolean badge = adBadge || customHit;
-            return new AdSignals(badge, skip, countdownSeen, value, ctaSeen, continuePrompt,
-                    episode, idHint, legacyCard, detail);
+            return new AdSignals(badge, skipStrict, skipGeneric, skipBounds, countdownSeen, value,
+                    ctaSeen, continuePrompt, episode, idHint, legacyCard, detail);
         }
     }
 }

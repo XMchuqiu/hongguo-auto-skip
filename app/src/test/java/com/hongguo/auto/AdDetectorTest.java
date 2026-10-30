@@ -29,9 +29,14 @@ public class AdDetectorTest {
         return new UiNode(text, desc, id, "android.widget.TextView", 0, 0, 0, 0, null);
     }
 
+    private static UiNode box(String text, String desc, String id, int l, int t, int r, int b) {
+        return new UiNode(text, desc, id, "android.widget.TextView", l, t, r, b, null);
+    }
+
+    // ---------- 红果免费漫剧：旧判据 ----------
+
     @Test
     public void comicEmptyEpisodeCardIsAd() {
-        // 红果免费漫剧旧版广告界面：集数控件 id=jer 存在但文本为空
         UiNode card = UiNode.group(UiNode.leaf("", null, "com.kylin.read:id/jer"));
         AdSignals signals = scan(true, card);
         assertTrue(signals.legacyEmptyEpisodeCard);
@@ -55,7 +60,7 @@ public class AdDetectorTest {
 
     @Test
     public void comicAdCardStillDetectedWhenLongTitleVisible() {
-        // 广告卡片上仍显示长剧集标题时，不能被"第N集"文本否决（否则平板上原本可用的行为会回退）
+        // 广告卡片上仍显示长剧集标题时，不能被"第N集"文本否决
         UiNode page = UiNode.group(
                 UiNode.leaf("第12集 总裁的替身新娘", null, null),
                 UiNode.leaf("", null, "com.kylin.read:id/jer"));
@@ -74,9 +79,10 @@ public class AdDetectorTest {
         assertFalse(scan(true, page).isAd());
     }
 
+    // ---------- 红果免费短剧：广告页 ----------
+
     @Test
     public void shortDramaAdBadgeWithCountdown() {
-        // 红果免费短剧的广告页：广告角标 + 倒计时 + 跳过 + 落地页按钮
         UiNode ad = UiNode.group(
                 UiNode.leaf("广告", null, null),
                 UiNode.leaf("5s", null, null),
@@ -88,6 +94,41 @@ public class AdDetectorTest {
         assertTrue(signals.skipButton);
         assertTrue(signals.countdown);
         assertEquals(Integer.valueOf(5), signals.countdownValue);
+    }
+
+    @Test
+    public void gameEndCardIsAd() {
+        // 短剧广告结束卡片：点击进入游戏 + 原始征途 + 上滑继续看短剧
+        UiNode card = UiNode.group(
+                UiNode.leaf("点击进入游戏", null, null),
+                UiNode.leaf("MMO | 第10名", null, null),
+                UiNode.leaf("原始征途", null, null),
+                UiNode.leaf("原汁原味，原始征途！", null, null),
+                UiNode.leaf("上滑继续看短剧", null, null));
+        AdSignals signals = scan(false, card);
+        assertTrue(signals.continuePrompt);
+        assertTrue(signals.cta);
+        assertTrue(signals.isAd());
+        assertFalse(signals.hasLiveCountdown());
+    }
+
+    @Test
+    public void comicEndCardWithOfficialDownload() {
+        // 漫剧广告结束卡片：广告角标 + 汽水音乐 + 商家推荐/精彩应用 + 官方下载 + 上滑继续观看短剧
+        UiNode card = UiNode.group(
+                UiNode.leaf("第25集", null, null),
+                UiNode.leaf("广告 | ⋯", null, null),
+                UiNode.leaf("汽水音乐", null, null),
+                UiNode.leaf("商家推荐", null, null),
+                UiNode.leaf("精彩应用", null, null),
+                UiNode.leaf("官方下载", null, null),
+                UiNode.leaf("上滑继续观看短剧", null, null));
+        AdSignals signals = scan(true, card);
+        assertTrue(signals.adBadge);
+        assertTrue(signals.cta);
+        assertTrue(signals.continuePrompt);
+        assertTrue(signals.isAd());
+        assertFalse(signals.hasLiveCountdown());
     }
 
     @Test
@@ -130,6 +171,28 @@ public class AdDetectorTest {
         AdSignals signals = scan(false, page);
         assertTrue(signals.cta);
         assertFalse(signals.isAd());
+    }
+
+    @Test
+    public void genericSkipAloneIsNotAd() {
+        // "跳过"单独出现（例如播放器的跳过片头）不能当广告
+        AdSignals intro = scan(false, UiNode.group(
+                UiNode.leaf("第3集", null, null),
+                UiNode.leaf("跳过片头", null, null)));
+        assertFalse(intro.genericSkip);
+        assertFalse(intro.isAd());
+    }
+
+    @Test
+    public void skipButtonRecordsBounds() {
+        UiNode ad = UiNode.group(
+                UiNode.leaf("广告", null, null),
+                box("跳过广告", null, null, 900, 60, 1050, 140));
+        AdSignals signals = scan(false, ad);
+        assertTrue(signals.skipButton);
+        assertTrue(signals.canTapSkip());
+        assertEquals(900, signals.skipBounds[0]);
+        assertEquals(140, signals.skipBounds[3]);
     }
 
     @Test

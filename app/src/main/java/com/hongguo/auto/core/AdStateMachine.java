@@ -1,32 +1,44 @@
 package com.hongguo.auto.core;
 
 /**
- * 广告状态机：把"每次扫描的结果"翻译成"要不要上滑"。
+ * 广告状态机：把"每次扫描的结果"翻译成"要不要点一下 / 上滑"。
  *
- * <p>设计目的：原来那版只要看到广告特征就立刻上滑，既容易在广告还在播时误触，也无法判断
- * "广告播完了"。这里改成三个明确的触发条件：
+ * <p>触发顺序（都受冷却、次数、滑后静默约束）：
  * <ol>
- *   <li>出现"上滑继续观看"提示 —— 立即上滑；</li>
- *   <li>广告角标/跳过按钮持续 N 毫秒且倒计时不再变化（广告播完后的结束卡片）—— 上滑；</li>
- *   <li>之前处于广告界面，这次扫描广告特征消失（广告播完自动退出）—— 上滑。</li>
+ *   <li>有明确的"跳过广告/关闭广告"按钮 → 直接点掉（最省事，也最像人工操作）；</li>
+ *   <li>倒计时归零 → 上滑；</li>
+ *   <li>出现"上滑继续看短剧"且页面上没有正在走的倒计时 → 说明到了广告结束卡片，上滑；</li>
+ *   <li>广告角标持续存在且倒计时不再变化 → 上滑；</li>
+ *   <li>广告长时间卡住 → 上滑兜底；</li>
+ *   <li>之前处于广告界面，这次广告特征整体消失 → 上滑。</li>
  * </ol>
- * 每次都受冷却时间、单段广告最大上滑次数、上滑后静默期的约束。
+ *
+ * <p>关键修正：旧逻辑把"上滑继续看短剧"直接当成广告结束，但红果在**广告播放期间**
+ * 也会一直显示这行提示，于是提前上滑、白滑一次，广告照样播完。
  */
 public final class AdStateMachine {
 
     public static final class Action {
-        public static final Action NONE = new Action(false, "");
+        public static final Action NONE = new Action(false, false, "", 0, null);
 
         public final boolean swipe;
+        public final boolean tap;
         public final String reason;
+        /** 上滑力度档位 0/1/2，越大越强力（起点更高、终点更低、更慢）。 */
+        public final int variant;
+        /** 点击目标的屏幕坐标 [left, top, right, bottom]，仅 tap 时有值。 */
+        public final int[] bounds;
 
-        private Action(boolean swipe, String reason) {
+        private Action(boolean swipe, boolean tap, String reason, int variant, int[] bounds) {
             this.swipe = swipe;
+            this.tap = tap;
             this.reason = reason;
+            this.variant = variant;
+            this.bounds = bounds;
         }
 
-        static Action swipe(String reason) {
-            return new Action(true, reason);
+        public boolean isAction() {
+            return swipe || tap;
         }
     }
 
@@ -37,9 +49,12 @@ public final class AdStateMachine {
     private long lastCountdownChangeMs;
     private Integer lastCountdown;
     private int attempts;
-    private long lastSwipeMs = Long.MIN_VALUE / 4;
+    private int swipeVariant;
+    private boolean skipTapped;
+    private long lastActionMs = Long.MIN_VALUE / 4;
     private long quietUntilMs;
     private long lastAdSeenMs;
+    private boolean lastHadLiveCountdown;
 
     public AdStateMachine(DetectorConfig config) {
         this.config = config == null ? DetectorConfig.defaults() : config;
@@ -57,20 +72,18 @@ public final class AdStateMachine {
         lastCountdownChangeMs = 0;
         lastCountdown = null;
         attempts = 0;
-        lastSwipeMs = Long.MIN_VALUE / 4;
+        swipeVariant = 0;
+        skipTapped = false;
+        lastActionMs = Long.MIN_VALUE / 4;
         quietUntilMs = 0;
         lastAdSeenMs = 0;
+        lastHadLiveCountdown = false;
     }
 
-    /** 当前是否处于"广告中"状态（给界面显示用）。 */
     public boolean isInAd() {
         return inAd;
     }
 
-    /**
-     * @param signals 本次扫描结果
-     * @param now     单调时钟（毫秒）
-     */
     public Action onScan(AdSignals signals, long now) {
         if (signals == null) {
             return Action.NONE;
@@ -80,81 +93,110 @@ public final class AdStateMachine {
             lastAdSeenMs = now;
         }
 
-        // 上滑后的静默期内什么都不做，避免一次广告连滑多次
         if (now < quietUntilMs) {
             return Action.NONE;
         }
 
-        // 广告已经消失超过 3 秒，视为这段广告结束，重置这轮状态
         if (!ad && inAd && now - lastAdSeenMs > 3000) {
             inAd = false;
             attempts = 0;
-        }
-
-        // 1) "上滑继续观看"——最明确的"广告播完了"
-        if (signals.continuePrompt && canSwipe(now)) {
-            return doSwipe(now, "出现继续观看提示");
+            swipeVariant = 0;
+            skipTapped = false;
         }
 
         if (ad) {
             if (!inAd) {
                 inAd = true;
                 adStartMs = now;
-                // 刚上滑完又检测到广告时不重置次数，避免同一条广告被反复上滑
-                if (now - lastSwipeMs > 3000) {
+                if (now - lastActionMs > 3000) {
                     attempts = 0;
+                    swipeVariant = 0;
+                    skipTapped = false;
                 }
                 lastCountdownChangeMs = now;
                 lastCountdown = signals.countdownValue;
             }
+
             if (signals.countdownValue != null && !signals.countdownValue.equals(lastCountdown)) {
                 lastCountdown = signals.countdownValue;
                 lastCountdownChangeMs = now;
             }
 
-            // 倒计时归零
-            if (signals.countdownValue != null && signals.countdownValue == 0 && canSwipe(now)) {
+            // 倒计时从"有"变成"没有"=广告播完切到结束卡片，前面白滑过也重新给机会
+            boolean liveNow = signals.hasLiveCountdown();
+            if (lastHadLiveCountdown && !liveNow) {
+                attempts = 0;
+                swipeVariant = 0;
+                lastCountdownChangeMs = now;
+            }
+            lastHadLiveCountdown = liveNow;
+
+            // 1) 有明确的跳过/关闭按钮 → 点掉
+            if (!skipTapped && signals.canTapSkip() && canAct(now)
+                    && (signals.skipButton || signals.adBadge || signals.countdown || signals.cta)) {
+                skipTapped = true;
+                return doTap(now, signals.skipBounds, "点击跳过按钮");
+            }
+
+            // 2) 倒计时归零
+            if (signals.countdownValue != null && signals.countdownValue == 0 && canAct(now)) {
                 return doSwipe(now, "倒计时归零");
             }
 
-            // 2) 广告标识持续存在且倒计时不再变化（结束卡片）
+            // 3) 广告结束卡片：有"上滑继续看短剧"，且没有正在走的倒计时
+            if (signals.continuePrompt && !signals.hasLiveCountdown() && canAct(now)) {
+                return doSwipe(now, "广告结束卡片（上滑继续）");
+            }
+
+            // 4) 广告标识持续存在且倒计时不再变化
             if (config.swipeOnPersist
+                    && !signals.hasLiveCountdown()
                     && now - adStartMs >= config.persistSwipeMs
                     && now - lastCountdownChangeMs >= config.persistSwipeMs
-                    && canSwipe(now)) {
+                    && canAct(now)) {
                 return doSwipe(now, "广告标识持续 " + (now - adStartMs) + "ms 未变化");
             }
 
-            // 3) 卡住太久，兜底
+            // 5) 卡住太久，兜底
             if (now - adStartMs >= config.stuckAdMs
                     && now - lastCountdownChangeMs >= config.stuckAdMs
-                    && canSwipe(now)) {
+                    && canAct(now)) {
                 return doSwipe(now, "广告卡住 " + (now - adStartMs) + "ms");
             }
             return Action.NONE;
         }
 
-        // 4) 广告特征消失——广告播完，自动回到短剧
+        // 6) 广告特征消失
         if (inAd) {
             long duration = now - adStartMs;
             inAd = false;
-            if (config.swipeOnAdEnd && duration >= config.minAdDurationMs && canSwipe(now)) {
-                return doSwipe(now, "广告结束（持续 " + duration + "ms）");
+            if (config.swipeOnAdEnd && duration >= config.minAdDurationMs && canAct(now)) {
+                return doSwipe(now, "广告消失（持续 " + duration + "ms）");
             }
         }
         return Action.NONE;
     }
 
-    private boolean canSwipe(long now) {
-        return attempts < config.maxSwipesPerAd && now - lastSwipeMs >= config.cooldownMs;
+    private boolean canAct(long now) {
+        return attempts < config.maxSwipesPerAd && now - lastActionMs >= config.cooldownMs;
     }
 
     private Action doSwipe(long now, String reason) {
+        int variant = swipeVariant;
+        if (swipeVariant < 2) {
+            swipeVariant++;
+        }
         attempts++;
-        lastSwipeMs = now;
+        lastActionMs = now;
         quietUntilMs = now + config.postSwipeQuietMs;
         inAd = false;
         lastCountdown = null;
-        return Action.swipe(reason);
+        return new Action(true, false, reason, variant, null);
+    }
+
+    private Action doTap(long now, int[] bounds, String reason) {
+        lastActionMs = now;
+        quietUntilMs = now + config.postSwipeQuietMs;
+        return new Action(false, true, reason, 0, bounds);
     }
 }

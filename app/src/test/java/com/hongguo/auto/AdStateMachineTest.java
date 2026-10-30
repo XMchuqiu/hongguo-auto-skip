@@ -11,25 +11,33 @@ import com.hongguo.auto.core.DetectorConfig;
 import org.junit.Test;
 
 /**
- * 状态机负责"什么时候上滑"，用假时钟验证各个分支。
+ * 状态机负责"什么时候点/上滑"，用假时钟验证各个分支。
  */
 public class AdStateMachineTest {
 
+    /** 广告角标 + 倒计时，没有跳过按钮。 */
     private static AdSignals ad(Integer countdown) {
-        return new AdSignals(true, countdown != null, countdown != null, countdown,
+        return new AdSignals(true, false, countdown != null, countdown,
                 false, false, false, false, false, "");
     }
 
-    private static AdSignals adWithSkip() {
-        return new AdSignals(true, true, true, 5, true, false, false, false, false, "");
+    /** 广告页：角标 + 倒计时 + 底部"上滑继续看短剧"（真实场景就是这样）。 */
+    private static AdSignals adWithPrompt(Integer countdown) {
+        return new AdSignals(true, false, countdown != null, countdown,
+                true, true, false, true, false, "");
+    }
+
+    /** 广告结束卡片：没有倒计时，只有落地页按钮 + "上滑继续看短剧"。 */
+    private static AdSignals endCard() {
+        return new AdSignals(false, false, false, null, true, true, false, false, false, "");
     }
 
     private static AdSignals normal() {
         return new AdSignals(false, false, false, null, false, false, true, false, false, "");
     }
 
-    private static AdSignals prompt() {
-        return new AdSignals(false, false, false, null, false, true, false, false, false, "");
+    private static AdSignals withSkipButton(int[] bounds) {
+        return new AdSignals(true, true, false, bounds, true, 30, true, false, false, false, false, "");
     }
 
     @Test
@@ -40,8 +48,8 @@ public class AdStateMachineTest {
         config.cooldownMs = 1000;
         AdStateMachine sm = new AdStateMachine(config);
 
-        assertFalse(sm.onScan(ad(5), 0).swipe);
-        assertFalse(sm.onScan(ad(4), 700).swipe);
+        assertFalse(sm.onScan(ad(5), 0).isAction());
+        assertFalse(sm.onScan(ad(4), 700).isAction());
         assertTrue(sm.onScan(normal(), 1400).swipe);
     }
 
@@ -52,8 +60,8 @@ public class AdStateMachineTest {
         config.minAdDurationMs = 800;
         AdStateMachine sm = new AdStateMachine(config);
 
-        assertFalse(sm.onScan(ad(5), 0).swipe);
-        assertFalse(sm.onScan(normal(), 300).swipe);
+        assertFalse(sm.onScan(ad(5), 0).isAction());
+        assertFalse(sm.onScan(normal(), 300).isAction());
     }
 
     @Test
@@ -63,31 +71,96 @@ public class AdStateMachineTest {
         config.cooldownMs = 2500;
         AdStateMachine sm = new AdStateMachine(config);
 
-        assertFalse(sm.onScan(ad(null), 0).swipe);
-        assertFalse(sm.onScan(ad(null), 600).swipe);
+        assertFalse(sm.onScan(ad(null), 0).isAction());
+        assertFalse(sm.onScan(ad(null), 600).isAction());
         assertTrue(sm.onScan(ad(null), 1300).swipe);
     }
 
     @Test
-    public void runningCountdownDelaysSwipe() {
+    public void tickingCountdownNeverSwipesUntilZero() {
         DetectorConfig config = DetectorConfig.defaults();
+        config.cooldownMs = 500;
         config.persistSwipeMs = 1200;
-        config.cooldownMs = 0;
         AdStateMachine sm = new AdStateMachine(config);
 
-        assertFalse(sm.onScan(adWithSkip(), 0).swipe);
-        assertFalse(sm.onScan(new AdSignals(true, true, true, 4, true, false, false, false, false, ""), 1000).swipe);
-        assertFalse(sm.onScan(new AdSignals(true, true, true, 3, true, false, false, false, false, ""), 2000).swipe);
-        // 倒计时停在 3 超过 1200ms，说明广告播放完毕、卡在结束卡片上
-        assertTrue(sm.onScan(new AdSignals(true, true, true, 3, true, false, false, false, false, ""), 3300).swipe);
+        assertFalse(sm.onScan(ad(21), 0).isAction());
+        assertFalse(sm.onScan(ad(20), 1000).isAction());
+        assertFalse(sm.onScan(ad(19), 2000).isAction());
+        assertFalse(sm.onScan(ad(19), 3000).isAction());
+        assertTrue(sm.onScan(ad(0), 4000).swipe);
     }
 
     @Test
-    public void continuePromptSwipesImmediately() {
+    public void continuePromptDuringPlaybackDoesNotSwipe() {
+        // 真实日志里的 bug：广告还剩 21s，但底部已经显示"上滑继续看短剧"
+        DetectorConfig config = DetectorConfig.defaults();
+        config.cooldownMs = 500;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(adWithPrompt(21), 0).isAction());
+        assertFalse(sm.onScan(adWithPrompt(20), 1000).isAction());
+        assertFalse(sm.onScan(adWithPrompt(19), 2000).isAction());
+    }
+
+    @Test
+    public void continuePromptAfterCountdownGoneSwipes() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.cooldownMs = 500;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(adWithPrompt(21), 0).isAction());
+        assertFalse(sm.onScan(adWithPrompt(20), 1000).isAction());
+        // 倒计时消失 = 广告播完，切到结束卡片
+        assertTrue(sm.onScan(endCard(), 2200).swipe);
+    }
+
+    @Test
+    public void endCardWithoutCountdownSwipesImmediately() {
         DetectorConfig config = DetectorConfig.defaults();
         config.cooldownMs = 0;
         AdStateMachine sm = new AdStateMachine(config);
-        assertTrue(sm.onScan(prompt(), 0).swipe);
+        assertTrue(sm.onScan(endCard(), 0).swipe);
+    }
+
+    @Test
+    public void tapsSkipButtonBeforeSwiping() {
+        DetectorConfig config = DetectorConfig.defaults();
+        AdStateMachine sm = new AdStateMachine(config);
+
+        AdStateMachine.Action action = sm.onScan(withSkipButton(new int[]{900, 60, 1050, 140}), 0);
+        assertTrue(action.tap);
+        assertFalse(action.swipe);
+        assertEquals(900, action.bounds[0]);
+        assertEquals(140, action.bounds[3]);
+
+        // 静默期内不重复点
+        assertFalse(sm.onScan(withSkipButton(new int[]{900, 60, 1050, 140}), 200).isAction());
+        // 静默期后也不会重复点同一个按钮
+        assertFalse(sm.onScan(withSkipButton(new int[]{900, 60, 1050, 140}), 6000).tap);
+    }
+
+    @Test
+    public void swipeVariantEscalates() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.persistSwipeMs = 500;
+        config.cooldownMs = 500;
+        config.postSwipeQuietMs = 100;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(ad(null), 0).isAction());
+        AdStateMachine.Action a1 = sm.onScan(ad(null), 600);
+        assertTrue(a1.swipe);
+        assertEquals(0, a1.variant);
+
+        assertFalse(sm.onScan(ad(null), 1400).isAction());
+        AdStateMachine.Action a2 = sm.onScan(ad(null), 1900);
+        assertTrue(a2.swipe);
+        assertEquals(1, a2.variant);
+
+        assertFalse(sm.onScan(ad(null), 2700).isAction());
+        AdStateMachine.Action a3 = sm.onScan(ad(null), 3200);
+        assertTrue(a3.swipe);
+        assertEquals(2, a3.variant);
     }
 
     @Test
@@ -98,10 +171,10 @@ public class AdStateMachineTest {
         config.postSwipeQuietMs = 200;
         AdStateMachine sm = new AdStateMachine(config);
 
-        assertFalse(sm.onScan(ad(null), 0).swipe);
+        assertFalse(sm.onScan(ad(null), 0).isAction());
         assertTrue(sm.onScan(ad(null), 700).swipe);
-        assertFalse(sm.onScan(ad(null), 1200).swipe);
-        assertFalse(sm.onScan(ad(null), 2000).swipe);
+        assertFalse(sm.onScan(ad(null), 1200).isAction());
+        assertFalse(sm.onScan(ad(null), 2000).isAction());
     }
 
     @Test
@@ -113,12 +186,12 @@ public class AdStateMachineTest {
         config.maxSwipesPerAd = 2;
         AdStateMachine sm = new AdStateMachine(config);
 
-        assertFalse(sm.onScan(ad(null), 0).swipe);
+        assertFalse(sm.onScan(ad(null), 0).isAction());
         assertTrue(sm.onScan(ad(null), 600).swipe);   // 第 1 次
-        assertFalse(sm.onScan(ad(null), 1400).swipe); // 上滑后重新计时
+        assertFalse(sm.onScan(ad(null), 1400).isAction());
         assertTrue(sm.onScan(ad(null), 1900).swipe);  // 第 2 次
-        assertFalse(sm.onScan(ad(null), 2700).swipe); // 次数用尽
-        assertFalse(sm.onScan(ad(null), 3500).swipe);
+        assertFalse(sm.onScan(ad(null), 2700).isAction());
+        assertFalse(sm.onScan(ad(null), 3500).isAction());
     }
 
     @Test
@@ -126,7 +199,7 @@ public class AdStateMachineTest {
         DetectorConfig config = DetectorConfig.defaults();
         AdStateMachine sm = new AdStateMachine(config);
         for (long t = 0; t < 20000; t += 700) {
-            assertFalse(sm.onScan(normal(), t).swipe);
+            assertFalse(sm.onScan(normal(), t).isAction());
         }
     }
 
@@ -137,12 +210,11 @@ public class AdStateMachineTest {
         config.cooldownMs = 0;
         config.postSwipeQuietMs = 0;
         AdStateMachine sm = new AdStateMachine(config);
-        assertFalse(sm.onScan(ad(null), 0).swipe);
+        assertFalse(sm.onScan(ad(null), 0).isAction());
         assertTrue(sm.onScan(ad(null), 600).swipe);
         sm.reset();
         assertFalse(sm.isInAd());
-        // 重置后需要重新累计"广告标识持续时间"，不能立刻再滑
-        assertFalse(sm.onScan(ad(null), 1000).swipe);
+        assertFalse(sm.onScan(ad(null), 1000).isAction());
         assertTrue(sm.onScan(ad(null), 1600).swipe);
     }
 }

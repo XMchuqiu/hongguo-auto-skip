@@ -80,6 +80,7 @@ public class HongguoAccessibilityService extends AccessibilityService {
     private String lastTargetPackage = "";
     private String lastDecisionLogged = "";
     private long lastDecisionLogAt;
+    private long lastConfigLogAt;
 
     @Override
     public void onServiceConnected() {
@@ -210,7 +211,12 @@ public class HongguoAccessibilityService extends AccessibilityService {
         if (!config.signature().equals(configSignature)) {
             configSignature = config.signature();
             stateMachine.setConfig(config);
-            AppLog.d(TAG, "参数已更新");
+            if (now - lastConfigLogAt > 3000) {
+                lastConfigLogAt = now;
+                AppLog.d(TAG, "参数已更新: 间隔=" + config.checkIntervalMs + "ms 冷却=" + config.cooldownMs
+                        + "ms 持续=" + config.persistSwipeMs + "ms 滑动=" + config.swipeDurationMs
+                        + "ms " + config.swipeFromPct + "%->" + config.swipeToPct + "%");
+            }
         }
         if (now - lastScanAt < config.checkIntervalMs) {
             return;
@@ -218,7 +224,7 @@ public class HongguoAccessibilityService extends AccessibilityService {
         lastScanAt = now;
         ServiceState.scanCount++;
 
-        if (ServiceState.dumpRequested.compareAndSet(true, false)) {
+        if (ServiceState.consumeDumpIfDue()) {
             dumpCurrentScreen();
         }
 
@@ -270,14 +276,18 @@ public class HongguoAccessibilityService extends AccessibilityService {
 
         logDecision(now, foreground, signals, action);
         if (action.swipe) {
-            performSwipe(config, area, foreground, action.reason);
+            ServiceState.lastDecision = "上滑 · " + action.reason + " · " + signals.describe();
+            performSwipe(config, area, foreground, action.reason, action.variant);
+        } else if (action.tap) {
+            ServiceState.lastDecision = "点击跳过 · " + action.reason + " · " + signals.describe();
+            performTap(action.bounds, foreground, action.reason);
         }
     }
 
     private void logDecision(long now, String pkg, AdSignals signals, AdStateMachine.Action action) {
         String line = pkg + " " + signals.describe();
-        if (action.swipe) {
-            return; // 上滑时会单独打日志
+        if (action.isAction()) {
+            return; // 动作本身会单独打日志
         }
         if (!line.equals(lastDecisionLogged) || now - lastDecisionLogAt > 10000) {
             lastDecisionLogged = line;
@@ -332,34 +342,46 @@ public class HongguoAccessibilityService extends AccessibilityService {
         return area;
     }
 
-    private void performSwipe(DetectorConfig config, int[] area, String pkg, String reason) {
-        DisplayMetrics metrics = getResources().getDisplayMetrics();
-        int left = 0;
-        int top = 0;
-        int right = metrics.widthPixels;
-        int bottom = metrics.heightPixels;
-        if (area != null && area[2] - area[0] > 100 && area[3] - area[1] > 200) {
-            left = area[0];
-            top = area[1];
-            right = area[2];
-            bottom = area[3];
+    /**
+     * 上滑。variant 越大越强力：起点更高、终点更低、时长更长，
+     * 用来对付"轻轻滑一下没反应"的广告页（首滑失败后自动升级）。
+     */
+    private void performSwipe(DetectorConfig config, int[] area, String pkg, String reason, int variant) {
+        int[] rect = resolveSwipeArea(area);
+        int left = rect[0];
+        int top = rect[1];
+        int right = rect[2];
+        int bottom = rect[3];
+
+        int fromPct = config.swipeFromPct;
+        int toPct = config.swipeToPct;
+        int duration = config.swipeDurationMs;
+        if (variant == 1) {
+            fromPct = Math.min(95, fromPct + 8);
+            toPct = Math.max(5, toPct - 10);
+            duration = Math.max(600, (int) (duration * 1.6f));
+        } else if (variant >= 2) {
+            fromPct = Math.min(97, fromPct + 12);
+            toPct = Math.max(3, toPct - 15);
+            duration = Math.max(800, duration * 2);
         }
+
         int height = bottom - top;
         float x = (left + right) / 2f;
-        float fromY = top + height * config.swipeFromPct / 100f;
-        float toY = top + height * config.swipeToPct / 100f;
+        float fromY = top + height * fromPct / 100f;
+        float toY = top + height * toPct / 100f;
 
         Path path = new Path();
         path.moveTo(x, fromY);
         path.lineTo(x, toY);
         GestureDescription gesture = new GestureDescription.Builder()
-                .addStroke(new GestureDescription.StrokeDescription(path, 0, Math.max(80, config.swipeDurationMs)))
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, Math.max(80, duration)))
                 .build();
 
         ServiceState.lastSwipeAt = System.currentTimeMillis();
         ServiceState.lastSwipeReason = reason;
-        AppLog.d(TAG, "上滑: pkg=" + pkg + " 原因=" + reason + " 区域=" + left + "," + top + "~" + right + "," + bottom
-                + " 坐标=" + (int) x + "," + (int) fromY + "->" + (int) toY + " 时长=" + config.swipeDurationMs + "ms");
+        AppLog.d(TAG, "上滑: pkg=" + pkg + " 原因=" + reason + " 力度=" + variant + " 区域=" + left + "," + top + "~" + right + "," + bottom
+                + " 坐标=" + (int) x + "," + (int) fromY + "->" + (int) toY + " 时长=" + duration + "ms");
 
         boolean dispatched;
         try {
@@ -390,6 +412,71 @@ public class HongguoAccessibilityService extends AccessibilityService {
         } else {
             showNotification("已自动跳过广告");
         }
+    }
+
+    /** 点击（用于"跳过广告/关闭广告"按钮）。 */
+    private void performTap(int[] bounds, String pkg, String reason) {
+        if (bounds == null || bounds.length < 4) {
+            return;
+        }
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int left = Math.max(0, Math.min(bounds[0], metrics.widthPixels - 1));
+        int top = Math.max(0, Math.min(bounds[1], metrics.heightPixels - 1));
+        int right = Math.max(left + 1, Math.min(bounds[2], metrics.widthPixels));
+        int bottom = Math.max(top + 1, Math.min(bounds[3], metrics.heightPixels));
+        float x = (left + right) / 2f;
+        float y = (top + bottom) / 2f;
+
+        Path path = new Path();
+        path.moveTo(x, y);
+        GestureDescription gesture = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, 60))
+                .build();
+
+        ServiceState.lastSwipeAt = System.currentTimeMillis();
+        ServiceState.lastSwipeReason = "点击: " + reason;
+        AppLog.d(TAG, "点击: pkg=" + pkg + " 原因=" + reason + " 坐标=" + (int) x + "," + (int) y
+                + " 区域=" + left + "," + top + "~" + right + "," + bottom);
+        try {
+            boolean ok = dispatchGesture(gesture, new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription description) {
+                    AppLog.d(TAG, "点击完成");
+                }
+
+                @Override
+                public void onCancelled(GestureDescription description) {
+                    AppLog.d(TAG, "点击被系统取消");
+                }
+            }, null);
+            if (!ok) {
+                AppLog.d(TAG, "点击派发失败");
+            }
+        } catch (Throwable t) {
+            AppLog.d(TAG, "点击异常: " + t);
+        }
+    }
+
+    /** 计算上滑区域：取窗口 bounds 与屏幕的交集；横竖屏、分屏、不同尺寸都适用。 */
+    private int[] resolveSwipeArea(int[] area) {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int left = 0;
+        int top = 0;
+        int right = metrics.widthPixels;
+        int bottom = metrics.heightPixels;
+        if (area != null && area.length >= 4) {
+            int l = Math.max(0, area[0]);
+            int t = Math.max(0, area[1]);
+            int r = Math.min(metrics.widthPixels, area[2]);
+            int b = Math.min(metrics.heightPixels, area[3]);
+            if (r - l >= 200 && b - t >= 300) {
+                left = l;
+                top = t;
+                right = r;
+                bottom = b;
+            }
+        }
+        return new int[]{left, top, right, bottom};
     }
 
     /** 手势被 ROM 拒绝时的兜底：直接让容器滚动一屏。 */
@@ -547,3 +634,4 @@ public class HongguoAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+

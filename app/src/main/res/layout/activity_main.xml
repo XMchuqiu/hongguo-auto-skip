@@ -217,12 +217,15 @@
             android:textSize="13sp" />
 
         <ScrollView
+            android:id="@+id/log_scroll"
             android:layout_width="match_parent"
             android:layout_height="200dp"
             android:layout_marginBottom="8dp"
             android:background="#22000000"
             android:fillViewport="true"
-            android:padding="8dp">
+            android:isScrollContainer="true"
+            android:padding="8dp"
+            android:scrollbars="vertical">
 
             <TextView
                 android:id="@+id/log_text"
@@ -231,6 +234,7 @@
                 android:fontFamily="monospace"
                 android:text="暂无日志"
                 android:textColor="#00dd00"
+                android:textIsSelectable="true"
                 android:textSize="11sp" />
         </ScrollView>
 
@@ -264,6 +268,30 @@
                 android:layout_weight="1"
                 android:backgroundTint="#3366aa"
                 android:text="导出"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/full_log_btn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="全屏查看日志"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/open_log_dir_btn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:backgroundTint="#555588"
+                android:text="打开日志存储位置"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -304,20 +332,33 @@
             android:id="@+id/keyword_list_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             android:background="#22000000"
             android:padding="8dp"
             android:text="暂无自定义关键词"
             android:textSize="12sp" />
 
         <TextView
+            android:id="@+id/keyword_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="#11ffffff"
+            android:lineSpacingExtra="3dp"
+            android:padding="10dp"
+            android:text="保存后如何生效说明"
+            android:textColor="#aaaaaa"
+            android:textSize="11sp" />
+
+        <TextView
             android:id="@+id/tips_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:lineSpacingExtra="4dp"
-            android:text="说明\n• 红果免费短剧、红果免费漫剧都支持，可分别开关\n• 检测间隔越短反应越快，但更耗电\n• 广告结束判定：广告标识持续这么久还没变化，就认为播完了，执行上滑\n• 荣耀 MagicOS / 华为鸿蒙：①无障碍开关打不开时，先到「应用设置 → 右上角 ⋮ → 允许受限设置」；②允许「自启动」「后台活动」；③电池优化设为「不限制」。否则无障碍服务会被系统清理\n• 若开启后没反应：点「抓取当前页面节点」，把日志导出后反馈"
+            android:text="说明\n• 红果免费短剧、红果免费漫剧都支持，可分别开关\n• 检测间隔越短反应越快，但更耗电\n• 广告结束判定：广告标识持续这么久还没变化，就认为播完了，执行上滑\n• 荣耀 MagicOS / 华为鸿蒙：①无障碍开关打不开时，先到「应用设置 → 右上角 ⋮ → 允许受限设置」；②允许「自启动」「后台活动」；③电池优化设为「不限制」。否则无障碍服务会被系统清理\n• 若开启后没反应：点「抓取当前页面节点」，导出后点「打开日志存储位置」把 txt 发出来\n• 日志区域可以直接上下滑动；点「全屏查看日志」能看完整内容\n• 竖屏、横屏、平板/手机各种尺寸都适用，滑动坐标按当前窗口和屏幕自动换算"
             android:textColor="#888888"
             android:textSize="12sp" />
 
     </LinearLayout>
 </ScrollView>
+

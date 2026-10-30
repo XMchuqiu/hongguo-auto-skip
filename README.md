@@ -1,4 +1,4 @@
-# 红果自动跳过 v2.0（修复版）
+# 红果自动跳过 v2.1（修复版）
 
 通过无障碍服务检测「红果免费短剧」「红果免费漫剧」的广告是否播放完毕，然后自动上滑继续播放，无需 Root。
 
@@ -7,9 +7,38 @@
 
 ## 下载
 
-- 直接安装：[dist/hongguo-auto-skip-v2.0.apk](dist/hongguo-auto-skip-v2.0.apk)（release，38 KB）
+- 直接安装：[dist/hongguo-auto-skip-v2.1.apk](dist/hongguo-auto-skip-v2.1.apk)（release，44 KB）
 - 自己编译：`./gradlew :app:assembleRelease`。仓库自带调试签名 `keystore/debug.keystore`（密码 `android`，别名 `androiddebugkey`），
   只为让 clone 下来就能构建，**对外分发请换成你自己的签名**。
+
+## v2.1 修复了什么（基于真机日志 + 截图）
+
+真机日志里暴露了一个关键 bug：
+
+```
+00:07:41.386 [Service] 检测: com.kylin.read 广告角标 倒计时=21s 落地页词 继续观看提示 第N集
+00:07:41.547 [Service] 上滑: pkg=com.kylin.read 原因=出现继续观看提示
+```
+
+**广告还剩 21 秒，但因为底部一直显示“上滑继续看短剧”，就直接上滑了。** 这行提示在广告播放期间
+就一直挂在底部（是"这个广告位之后可以上滑继续"的常驻提示），并不是广告结束的标志。结果就是：
+提前滑一次 → 广告照样播完 → 真正该滑的时候已经被冷却/次数限制挡住。
+
+v2.1 的处理：
+
+| 改动 | 说明 |
+|---|---|
+| "上滑继续看短剧"不再单独触发 | 只有**页面上没有正在走的倒计时**（倒计时消失或归零）时，才把它当成"广告结束卡片" |
+| 新增“点击跳过广告” | 页面上有"跳过广告/关闭广告/跳过/关闭"按钮时，直接点掉（比滑一下更接近人工操作），并排除"跳过片头/片尾" |
+| 上滑力度自动升级 | 第一次 78%→22%；没反应就 86%→12%；再没反应 90%→7%，时长也从 450ms 提到 900ms |
+| 滑动区域裁剪 | 窗口 bounds 可能是 0,0~1280,**2800**，而屏幕只有 1280x**2659**（状态栏高度差），旧版会滑到屏幕外。现在取"窗口 ∩ 屏幕"，横屏、分屏、平板手机都适用 |
+| 倒计时消失立刻重试 | 倒计时从"有"变"没有"=广告播完切结束卡片，之前白滑的次数清零，重新给 3 次机会 |
+| 抓取节点延迟 5 秒 | 点按钮时前台是本应用，抓不到广告页；现在等 5 秒，够切回红果再抓 |
+| 日志可滑动 / 全屏查看 | 日志区自带滚动（不再被外层 ScrollView 抢手势），点「全屏查看日志」可看完整内容并复制 |
+| 打开日志存储位置 | 日志导出到 `Download/红果自动跳过/`，「打开日志存储位置」直接在文件管理器里打开该目录（失败则打开文件/复制路径） |
+| 关键词说明 | 自定义关键词下方写明生效规则、写法建议、会误伤的词，并列出内置覆盖的词 |
+| 横竖屏与尺寸适配 | 抓取/滑动全部按当前窗口与屏幕换算；界面加 `configChanges`，横竖屏切换不重建、参数不丢 |
+| 修复“已安装 ✗” | Android 11+ 包可见性，manifest 增加 `<queries>`，现在能正确识别红果是否已安装 |
 
 ---
 
@@ -99,8 +128,9 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ## 六、验证情况
 
-- `gradle :app:testDebugUnitTest`：**26 个单元测试全部通过**（检测规则 17 + 状态机 9），覆盖漫剧空集数卡片、
-  短剧广告角标+倒计时+跳过按钮、正常播放页面、隐藏节点、多窗口、自定义关键词、冷却/次数限制等。
+- `gradle :app:testDebugUnitTest`：**34 个单元测试全部通过**（检测规则 21 + 状态机 13），覆盖漫剧空集数卡片、
+  短剧广告角标+倒计时+跳过按钮、游戏/应用下载结束卡片、正常播放页面、隐藏节点、多窗口、自定义关键词、
+  “倒计时未走完不许滑”、点击跳过、滑动力度升级、冷却/次数限制等。
 - `gradle :app:assembleDebug/Release`：构建成功；`aapt2 dump badging` 确认包名/权限/无障碍组件；
   `apksigner verify` 通过。
 - **没有在荣耀 MagicOS 真机上验证过**（这台电脑上没有连接设备；本机 Android 模拟器在 WHPX 下启动失败）。
@@ -109,7 +139,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 ## 七、已知限制
 
 - 只在电脑侧做了规则级单元测试和构建验证，**没有在荣耀 MagicOS 真机上跑过**（当前环境没有连接设备）。
-- 如果某个版本的短剧广告页既没有"广告"角标、也没有倒计时/跳过按钮（纯画面），无障碍层面无法识别，需要用「抓取当前页面节点」拿到实际控件再加规则。
+- 如果某个版本的广告页完全没有任何可读节点（纯画面视频 + 图片角标），无障碍层面无法识别，需要用「抓取当前页面节点」拿到实际控件再加规则。
 - 广告跳转到外部 App（电商/游戏）时，前台包名不再是红果，本应用不会跟随跳转操作；等回到红果后继续检测。
 - 覆盖安装需要先卸载旧版（签名不同）。
 
@@ -122,7 +152,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ```powershell
 adb install -r .\mockdrama\app\build\outputs\apk\debug\app-debug.apk   # 假红果
-adb install -r .\红果自动跳过-v2.0-debug.apk                          # 本应用
+adb install -r .\红果自动跳过-v2.1-debug.apk                          # 本应用
 adb shell settings put secure enabled_accessibility_services com.hongguo.auto/com.hongguo.auto.HongguoAccessibilityService
 adb shell settings put secure accessibility_enabled 1
 adb shell am start -n com.phoenix.read/.MockActivity
@@ -141,3 +171,5 @@ adb logcat -s Service MockDrama
 - `E:\DSH\work`（反编译出来的旧版源码，用来对照）
 
 删除后若要重新构建，装 Android Studio 或用 `gradle :app:assembleRelease` 即可，项目本身是标准结构。
+
+
