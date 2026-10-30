@@ -1,4 +1,4 @@
-# 红果自动跳过 v2.4（修复版）
+# 红果自动跳过 v2.5（修复版）
 
 通过无障碍服务检测「红果免费短剧」「红果免费漫剧」的广告是否播放完毕，然后自动上滑继续播放，无需 Root。
 
@@ -7,9 +7,22 @@
 
 ## 下载
 
-- 直接安装：[dist/hongguo-auto-skip-v2.4.apk](dist/hongguo-auto-skip-v2.4.apk)（release）
+- 直接安装：[dist/hongguo-auto-skip-v2.5.apk](dist/hongguo-auto-skip-v2.5.apk)（release）
 - 自己编译：`./gradlew :app:assembleRelease`。仓库自带调试签名 `keystore/debug.keystore`（密码 `android`，别名 `androiddebugkey`），
   只为让 clone 下来就能构建，**对外分发请换成你自己的签名**。
+
+## v2.5 新增：持续上滑模式（独立开关）
+
+广告的"播完信号"不可靠时，可以换一种策略：**只要页面还判定为广告，就按固定间隔一直上滑。**
+
+- 界面上是**独立的一节**「持续上滑模式」，默认开启，间隔可调 300–2000ms（默认 800ms）
+- 与下面的「参数调节」**完全独立**：不受防抖冷却、广告结束判定、结束卡片确认的影响
+- **正常播放页不会动作**：只有在识别到广告特征（广告角标/跳过按钮/倒计时/落地页词/上滑提示）时才滑
+- 安全阀：同一条广告最多连续滑 40 次（约 30 秒）；广告一旦消失立刻停止，且**不会再补滑一下**
+  （否则会多跳一集）
+- 速度：开启后扫描节奏会自动跟上间隔（取「检测间隔」与「持续上滑间隔」的较小值）
+
+想回到"等广告播完再滑"的老逻辑，把这个开关关掉即可，下面的参数立刻重新生效。
 
 ## v2.4 修复了什么
 
@@ -215,7 +228,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ## 六、验证情况
 
-- `gradle :app:testDebugUnitTest`：**42 个单元测试全部通过**（检测规则 21 + 状态机 17 + 参数校验 4），覆盖漫剧空集数卡片、
+- `gradle :app:testDebugUnitTest`：**46 个单元测试全部通过**（检测规则 21 + 状态机 21 + 参数校验 4），覆盖漫剧空集数卡片、
   短剧广告角标+倒计时+跳过按钮、游戏/应用下载结束卡片、正常播放页面、隐藏节点、多窗口、自定义关键词、
   “倒计时未走完不许滑”、点击跳过、力度升级、结束卡片稳定性确认、广告卡死的切后台兜底、冷却/次数限制等。
 - `gradle :app:assembleDebug/Release`：构建成功；`aapt2 dump badging` 确认包名/权限/无障碍组件；
@@ -239,7 +252,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ```powershell
 adb install -r .\mockdrama\app\build\outputs\apk\debug\app-debug.apk   # 假红果
-adb install -r .\红果自动跳过-v2.4-debug.apk                          # 本应用
+adb install -r .\红果自动跳过-v2.5-debug.apk                          # 本应用
 adb shell settings put secure enabled_accessibility_services com.hongguo.auto/com.hongguo.auto.HongguoAccessibilityService
 adb shell settings put secure accessibility_enabled 1
 adb shell am start -n com.phoenix.read/.MockActivity
@@ -258,6 +271,7 @@ adb logcat -s Service MockDrama
 - `E:\DSH\work`（反编译出来的旧版源码，用来对照）
 
 删除后若要重新构建，装 Android Studio 或用 `gradle :app:assembleRelease` 即可，项目本身是标准结构。
+
 
 
 

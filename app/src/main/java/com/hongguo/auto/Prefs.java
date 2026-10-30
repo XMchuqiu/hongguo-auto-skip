@@ -30,6 +30,9 @@ public final class Prefs {
     /** 广告卡住时自动切后台再回来。 */
     public static final String KEY_ESCAPE = "escape_enabled";
     public static final String KEY_ESCAPE_AFTER = "escape_after_ms";
+    /** 检测到广告后持续上滑。 */
+    public static final String KEY_CONTINUOUS = "continuous_swipe";
+    public static final String KEY_CONTINUOUS_INTERVAL = "continuous_interval_ms";
 
     public static final int DEFAULT_SWIPE_DURATION = 450;
     public static final int DEFAULT_SWIPE_FROM = 78;
@@ -38,6 +41,7 @@ public final class Prefs {
     public static final int DEFAULT_COOLDOWN = 2500;
     public static final int DEFAULT_PERSIST = 1200;
     public static final int DEFAULT_ESCAPE_AFTER = 15000;
+    public static final int DEFAULT_CONTINUOUS_INTERVAL = 800;
 
     private Prefs() {
     }
@@ -59,6 +63,9 @@ public final class Prefs {
         config.sanitize();
         config.escapeEnabled = prefs.getBoolean(KEY_ESCAPE, true);
         config.escapeAfterMs = clamp(prefs.getInt(KEY_ESCAPE_AFTER, DEFAULT_ESCAPE_AFTER), 5000, 60000);
+        config.continuousSwipe = prefs.getBoolean(KEY_CONTINUOUS, true);
+        config.continuousSwipeIntervalMs = clamp(
+                prefs.getInt(KEY_CONTINUOUS_INTERVAL, DEFAULT_CONTINUOUS_INTERVAL), 300, 3000);
         return config;
     }
 
@@ -105,5 +112,6 @@ public final class Prefs {
         return value < min ? min : (value > max ? max : value);
     }
 }
+
 
 

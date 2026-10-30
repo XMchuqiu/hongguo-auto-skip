@@ -272,6 +272,58 @@ public class AdStateMachineTest {
     }
 
     @Test
+    public void continuousSwipeRepeatsAtInterval() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.continuousSwipe = true;
+        config.continuousSwipeIntervalMs = 800;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertTrue(sm.onScan(ad(30), 0).swipe);
+        assertFalse(sm.onScan(ad(30), 400).isAction());
+        assertTrue(sm.onScan(ad(30), 900).swipe);
+        assertFalse(sm.onScan(ad(30), 1300).isAction());
+        assertTrue(sm.onScan(ad(30), 1800).swipe);
+    }
+
+    @Test
+    public void continuousSwipeStopsWhenAdGone() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.continuousSwipe = true;
+        config.continuousSwipeIntervalMs = 500;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertTrue(sm.onScan(ad(20), 0).swipe);
+        // 页面回到正常播放后，不能再多滑一下（会多跳一集）
+        assertFalse(sm.onScan(normal(), 900).isAction());
+        assertFalse(sm.onScan(normal(), 1600).isAction());
+    }
+
+    @Test
+    public void continuousSwipeStopsAtMaxCount() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.continuousSwipe = true;
+        config.continuousSwipeIntervalMs = 500;
+        config.maxContinuousSwipes = 3;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertTrue(sm.onScan(ad(30), 0).swipe);
+        assertTrue(sm.onScan(ad(30), 600).swipe);
+        assertTrue(sm.onScan(ad(30), 1200).swipe);
+        assertFalse(sm.onScan(ad(30), 1800).isAction());
+    }
+
+    @Test
+    public void continuousSwipeDisabledKeepsOldBehavior() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.continuousSwipe = false;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(ad(30), 0).isAction());
+        assertFalse(sm.onScan(ad(30), 400).isAction());
+        assertFalse(sm.onScan(ad(30), 1200).isAction());
+    }
+
+    @Test
     public void resetClearsState() {
         DetectorConfig config = DetectorConfig.defaults();
         config.persistSwipeMs = 500;
@@ -286,5 +338,6 @@ public class AdStateMachineTest {
         assertTrue(sm.onScan(ad(null), 1600).swipe);
     }
 }
+
 
 

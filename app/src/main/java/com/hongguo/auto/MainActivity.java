@@ -62,6 +62,9 @@ public class MainActivity extends Activity {
     private Switch appComicSwitch;
     private Switch debugSwitch;
     private Switch escapeSwitch;
+    private Switch continuousSwitch;
+    private SeekBar seekContinuous;
+    private TextView labelContinuous;
     private EditText keywordInput;
     private SeekBar seekSwipeDuration;
     private SeekBar seekSwipeFrom;
@@ -107,6 +110,9 @@ public class MainActivity extends Activity {
         appComicSwitch = findViewById(R.id.app_comic_switch);
         debugSwitch = findViewById(R.id.debug_switch);
         escapeSwitch = findViewById(R.id.escape_switch);
+        continuousSwitch = findViewById(R.id.continuous_switch);
+        seekContinuous = findViewById(R.id.seek_continuous);
+        labelContinuous = findViewById(R.id.label_continuous);
         keywordInput = findViewById(R.id.keyword_input);
 
         seekSwipeDuration = findViewById(R.id.seek_swipe_duration);
@@ -128,7 +134,9 @@ public class MainActivity extends Activity {
         setupSwitches();
 
         setupSeekBars();
+        setupContinuousSeekBar();
         loadPrefsToUi();
+        updateContinuousLabel();
         updateKeywordList();
         updateLogText();
         refreshStatus();
@@ -310,6 +318,15 @@ public class MainActivity extends Activity {
                 prefs.edit().putBoolean(Prefs.KEY_APP_COMIC, isChecked).apply();
             }
         });
+        continuousSwitch.setChecked(prefs.getBoolean(Prefs.KEY_CONTINUOUS, true));
+        continuousSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                prefs.edit().putBoolean(Prefs.KEY_CONTINUOUS, isChecked).apply();
+                toast(isChecked ? "广告页会按设定间隔持续上滑" : "已改为等广告播完再上滑");
+                updateContinuousLabel();
+            }
+        });
         escapeSwitch.setChecked(prefs.getBoolean(Prefs.KEY_ESCAPE, true));
         escapeSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -374,6 +391,36 @@ public class MainActivity extends Activity {
         bindSeekBar(seekPersist, 300, 5000, labelPersist, "广告结束判定：", " ms");
     }
 
+    private void setupContinuousSeekBar() {
+        seekContinuous.setMax(2000 - 300);
+        seekContinuous.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int value = 300 + progress;
+                labelContinuous.setText("持续上滑间隔：" + value + " ms");
+                if (fromUser) {
+                    prefs.edit().putInt(Prefs.KEY_CONTINUOUS_INTERVAL, value).apply();
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+    }
+
+    private void updateContinuousLabel() {
+        int value = Prefs.clamp(prefs.getInt(Prefs.KEY_CONTINUOUS_INTERVAL,
+                Prefs.DEFAULT_CONTINUOUS_INTERVAL), 300, 3000);
+        labelContinuous.setText("持续上滑间隔：" + value + " ms");
+        labelContinuous.setAlpha(continuousSwitch.isChecked() ? 1f : 0.5f);
+        seekContinuous.setEnabled(continuousSwitch.isChecked());
+    }
+
     private void loadPrefsToUi() {
         DetectorConfig config = Prefs.readConfig(this, prefs);
         seekSwipeDuration.setProgress(config.swipeDurationMs - 100);
@@ -382,6 +429,7 @@ public class MainActivity extends Activity {
         seekCheckInterval.setProgress(config.checkIntervalMs - 200);
         seekCooldown.setProgress(config.cooldownMs - 500);
         seekPersist.setProgress(config.persistSwipeMs - 300);
+        seekContinuous.setProgress(Prefs.clamp(config.continuousSwipeIntervalMs, 300, 2000) - 300);
         labelSwipeDuration.setText("滑动时长：" + config.swipeDurationMs + " ms");
         labelSwipeFrom.setText("滑动起点（手指按下）：" + config.swipeFromPct + " %");
         labelSwipeTo.setText("滑动终点（手指抬起）：" + config.swipeToPct + " %");
@@ -479,6 +527,10 @@ public class MainActivity extends Activity {
             sb.append("服务状态：无障碍未授权 ✗");
         }
         sb.append('\n').append("自动跳过：").append(enabled ? "已启用" : "未启用");
+        boolean continuous = prefs.getBoolean(Prefs.KEY_CONTINUOUS, true);
+        sb.append('\n').append("持续上滑：").append(continuous
+                ? "开（" + Prefs.clamp(prefs.getInt(Prefs.KEY_CONTINUOUS_INTERVAL, Prefs.DEFAULT_CONTINUOUS_INTERVAL), 300, 3000) + "ms/次）"
+                : "关（等广告播完再滑）");
         sb.append('\n').append("检测次数：").append(ServiceState.scanCount);
         if (!ServiceState.foregroundPackage.isEmpty()) {
             sb.append('\n').append("当前前台：").append(ServiceState.foregroundPackage);
@@ -706,6 +758,8 @@ public class MainActivity extends Activity {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }
+
+
 
 
 

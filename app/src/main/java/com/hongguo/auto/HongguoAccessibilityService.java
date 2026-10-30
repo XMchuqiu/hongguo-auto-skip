@@ -218,7 +218,10 @@ public class HongguoAccessibilityService extends AccessibilityService {
                         + "ms " + config.swipeFromPct + "%->" + config.swipeToPct + "%");
             }
         }
-        if (now - lastScanAt < config.checkIntervalMs) {
+        long scanGate = config.continuousSwipe
+                ? Math.min(config.checkIntervalMs, config.continuousSwipeIntervalMs)
+                : config.checkIntervalMs;
+        if (now - lastScanAt < scanGate) {
             return;
         }
         lastScanAt = now;
@@ -728,6 +731,7 @@ public class HongguoAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
 
 
 

@@ -56,6 +56,7 @@ public final class AdStateMachine {
     private long quietUntilMs;
     private long lastAdSeenMs;
     private boolean lastHadLiveCountdown;
+    private int continuousCount;
     private boolean everHadLiveCountdown;
 
     public AdStateMachine(DetectorConfig config) {
@@ -83,6 +84,7 @@ public final class AdStateMachine {
         lastAdSeenMs = 0;
         lastHadLiveCountdown = false;
         everHadLiveCountdown = false;
+        continuousCount = 0;
     }
 
     public boolean isInAd() {
@@ -153,6 +155,14 @@ public final class AdStateMachine {
                 return doSwipe(now, "倒计时归零");
             }
 
+            // 2.5) 持续上滑：只要还判定为广告页，就按固定间隔一直滑
+            //      （不等"广告结束"信号，适合结束信号不可靠的广告页）
+            if (config.continuousSwipe
+                    && continuousCount < config.maxContinuousSwipes
+                    && now - lastActionMs >= config.continuousSwipeIntervalMs) {
+                return doContinuousSwipe(now);
+            }
+
             // 3) 结束卡片：有"上滑继续看短剧"，且连续一段时间没有倒计时
             //    （倒计时偶尔不渲染时不至于误判，等它稳定下来再滑）
             if (signals.continuePrompt && !liveNow && noCountdownSince >= 0
@@ -198,7 +208,10 @@ public final class AdStateMachine {
         if (inAd) {
             long duration = now - adStartMs;
             inAd = false;
-            if (config.swipeOnAdEnd && duration >= config.minAdDurationMs && canAct(now)) {
+            continuousCount = 0;
+            // 持续上滑模式下，广告消失说明已经翻过去了，不能再补一刀（会多跳一集）
+            if (!config.continuousSwipe && config.swipeOnAdEnd
+                    && duration >= config.minAdDurationMs && canAct(now)) {
                 return doSwipe(now, "广告消失（持续 " + duration + "ms）");
             }
         }
@@ -212,6 +225,7 @@ public final class AdStateMachine {
         escaped = false;
         noCountdownSince = -1;
         everHadLiveCountdown = false;
+        continuousCount = 0;
     }
 
     private boolean canAct(long now) {
@@ -231,11 +245,20 @@ public final class AdStateMachine {
         return new Action(true, false, false, reason, variant, null);
     }
 
+    /** 持续上滑：不进入长静默，节奏由 continuousSwipeIntervalMs 控制。 */
+    private Action doContinuousSwipe(long now) {
+        continuousCount++;
+        lastActionMs = now;
+        quietUntilMs = 0;
+        return new Action(true, false, false, "广告页面持续上滑（第 " + continuousCount + " 次）", 0, null);
+    }
+
     private Action doTap(long now, int[] bounds, String reason) {
         lastActionMs = now;
         quietUntilMs = now + config.postSwipeQuietMs;
         return new Action(false, true, false, reason, 0, bounds);
     }
 }
+
 
 

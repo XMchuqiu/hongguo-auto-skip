@@ -27,6 +27,13 @@ public final class DetectorConfig {
     public int escapeAfterMs = 15000;
     /** 是否允许自动切后台再回来。 */
     public boolean escapeEnabled = true;
+
+    /** 检测到广告后是否"持续上滑"（不等结束信号，按固定间隔一直滑）。默认关闭，由设置决定。 */
+    public boolean continuousSwipe = false;
+    /** 持续上滑的间隔（毫秒）。 */
+    public int continuousSwipeIntervalMs = 800;
+    /** 同一条广告最多连续滑多少次（防止误判时无限滑）。 */
+    public int maxContinuousSwipes = 40;
     /** 上滑之后的静默期，避免一次广告连滑好几次。 */
     public int postSwipeQuietMs = 4000;
     /** 同一段广告最多上滑几次。 */
@@ -62,6 +69,9 @@ public final class DetectorConfig {
         c.endCardConfirmMs = endCardConfirmMs;
         c.escapeAfterMs = escapeAfterMs;
         c.escapeEnabled = escapeEnabled;
+        c.continuousSwipe = continuousSwipe;
+        c.continuousSwipeIntervalMs = continuousSwipeIntervalMs;
+        c.maxContinuousSwipes = maxContinuousSwipes;
         c.postSwipeQuietMs = postSwipeQuietMs;
         c.maxSwipesPerAd = maxSwipesPerAd;
         c.stuckAdMs = stuckAdMs;
@@ -79,7 +89,7 @@ public final class DetectorConfig {
         return checkIntervalMs + "|" + cooldownMs + "|" + persistSwipeMs + "|" + minAdDurationMs + "|"
                 + postSwipeQuietMs + "|" + maxSwipesPerAd + "|" + stuckAdMs + "|" + endCardConfirmMs + "|" + escapeAfterMs + "|" + escapeEnabled + "|"
                 + swipeFromPct + "|" + swipeToPct + "|" + swipeDurationMs + "|"
-                + swipeOnAdEnd + "|" + swipeOnPersist + "|" + customKeywords.hashCode();
+                + swipeOnAdEnd + "|" + swipeOnPersist + "|" + continuousSwipe + "|" + continuousSwipeIntervalMs + "|" + customKeywords.hashCode();
     }
 
     /**
@@ -97,6 +107,8 @@ public final class DetectorConfig {
         stuckAdMs = clampRange(stuckAdMs, 5000, 180000);
         swipeDurationMs = clampRange(swipeDurationMs, 100, 2000);
         escapeAfterMs = clampRange(escapeAfterMs, 5000, 60000);
+        continuousSwipeIntervalMs = clampRange(continuousSwipeIntervalMs, 300, 3000);
+        maxContinuousSwipes = clampRange(maxContinuousSwipes, 5, 200);
 
         swipeFromPct = clampRange(swipeFromPct, 30, 95);
         swipeToPct = clampRange(swipeToPct, 2, 70);
@@ -112,5 +124,7 @@ public final class DetectorConfig {
         return value < min ? min : (value > max ? max : value);
     }
 }
+
+
 
 
