@@ -56,6 +56,7 @@ public final class AdStateMachine {
     private long quietUntilMs;
     private long lastAdSeenMs;
     private boolean lastHadLiveCountdown;
+    private boolean everHadLiveCountdown;
 
     public AdStateMachine(DetectorConfig config) {
         this.config = config == null ? DetectorConfig.defaults() : config;
@@ -81,6 +82,7 @@ public final class AdStateMachine {
         quietUntilMs = 0;
         lastAdSeenMs = 0;
         lastHadLiveCountdown = false;
+        everHadLiveCountdown = false;
     }
 
     public boolean isInAd() {
@@ -123,6 +125,9 @@ public final class AdStateMachine {
 
             // 倒计时从"有"变成"没有"=广告播完切到结束卡片，前面白滑过也重新给机会
             boolean liveNow = signals.hasLiveCountdown();
+            if (liveNow) {
+                everHadLiveCountdown = true;
+            }
             if (lastHadLiveCountdown && !liveNow) {
                 attempts = 0;
                 swipeVariant = 0;
@@ -156,10 +161,16 @@ public final class AdStateMachine {
             }
 
             // 4) 广告角标持续存在且倒计时不再变化
+            //    同样要求"没有倒计时"这件事稳定够久，否则广告浮层被裁到屏幕外时会误判
+            // 这条广告出现过倒计时，就要求"没有倒计时"持续够久；从没出现过倒计时的静态广告卡片
+            // 只需要 persistSwipeMs 即可
+            int persistNeedMs = everHadLiveCountdown
+                    ? Math.max(config.persistSwipeMs, config.endCardConfirmMs)
+                    : config.persistSwipeMs;
             if (config.swipeOnPersist
                     && !liveNow
-                    && now - adStartMs >= config.persistSwipeMs
-                    && now - lastCountdownChangeMs >= config.persistSwipeMs
+                    && now - adStartMs >= persistNeedMs
+                    && now - lastCountdownChangeMs >= persistNeedMs
                     && canAct(now)) {
                 return doSwipe(now, "广告标识持续 " + (now - adStartMs) + "ms 未变化");
             }
@@ -200,6 +211,7 @@ public final class AdStateMachine {
         skipTapped = false;
         escaped = false;
         noCountdownSince = -1;
+        everHadLiveCountdown = false;
     }
 
     private boolean canAct(long now) {
@@ -225,4 +237,5 @@ public final class AdStateMachine {
         return new Action(false, true, false, reason, 0, bounds);
     }
 }
+
 

@@ -1,4 +1,4 @@
-# 红果自动跳过 v2.3（修复版）
+# 红果自动跳过 v2.4（修复版）
 
 通过无障碍服务检测「红果免费短剧」「红果免费漫剧」的广告是否播放完毕，然后自动上滑继续播放，无需 Root。
 
@@ -7,9 +7,35 @@
 
 ## 下载
 
-- 直接安装：[dist/hongguo-auto-skip-v2.3.apk](dist/hongguo-auto-skip-v2.3.apk)（release）
+- 直接安装：[dist/hongguo-auto-skip-v2.4.apk](dist/hongguo-auto-skip-v2.4.apk)（release）
 - 自己编译：`./gradlew :app:assembleRelease`。仓库自带调试签名 `keystore/debug.keystore`（密码 `android`，别名 `androiddebugkey`），
   只为让 clone 下来就能构建，**对外分发请换成你自己的签名**。
+
+## v2.4 修复了什么
+
+真机日志（01:01 那份）里出现了「广告还剩 17 秒就被上滑」：
+
+```
+01:00:45.515 检测: com.kylin.read 广告角标 倒计时=17s 落地页词 继续提示 第N集
+01:00:45.531 检测: com.kylin.read 广告角标 落地页词 继续提示          ← 倒计时"消失"
+01:00:46.330 上滑: pkg=com.kylin.read 原因=广告结束卡片（上滑继续）
+```
+
+原因在 dump 里看得很清楚：
+
+```
+id=- desc=[广告] bounds=968,0,1108,-2534
+```
+
+广告浮层的节点**高度是负的**（被裁到屏幕外），所以每隔几次扫描，倒计时、第N集这些节点就会"看不见"一次。
+0.6 秒的结束卡片确认时间太短，一次抖动就被判成"广告播完"。
+
+修复：
+
+- **结束卡片确认时间 0.6s → 2.5s**：`上滑继续观看` + 没有倒计时，必须稳定 2.5 秒才动手
+- **广告标识持续判定同样加确认窗口**：只要这条广告出现过倒计时，就要求"无倒计时"持续够久；
+  从没出现过倒计时的静态广告卡片仍按原来的 1.2s 处理，不会变慢
+- 新增两个单测复现这条日志：倒计时抖动不触发、只有真正结束后才上滑
 
 ## v2.3 修复了什么
 
@@ -189,7 +215,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ## 六、验证情况
 
-- `gradle :app:testDebugUnitTest`：**40 个单元测试全部通过**（检测规则 21 + 状态机 15 + 参数校验 4），覆盖漫剧空集数卡片、
+- `gradle :app:testDebugUnitTest`：**42 个单元测试全部通过**（检测规则 21 + 状态机 17 + 参数校验 4），覆盖漫剧空集数卡片、
   短剧广告角标+倒计时+跳过按钮、游戏/应用下载结束卡片、正常播放页面、隐藏节点、多窗口、自定义关键词、
   “倒计时未走完不许滑”、点击跳过、力度升级、结束卡片稳定性确认、广告卡死的切后台兜底、冷却/次数限制等。
 - `gradle :app:assembleDebug/Release`：构建成功；`aapt2 dump badging` 确认包名/权限/无障碍组件；
@@ -213,7 +239,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ```powershell
 adb install -r .\mockdrama\app\build\outputs\apk\debug\app-debug.apk   # 假红果
-adb install -r .\红果自动跳过-v2.3-debug.apk                          # 本应用
+adb install -r .\红果自动跳过-v2.4-debug.apk                          # 本应用
 adb shell settings put secure enabled_accessibility_services com.hongguo.auto/com.hongguo.auto.HongguoAccessibilityService
 adb shell settings put secure accessibility_enabled 1
 adb shell am start -n com.phoenix.read/.MockActivity
@@ -232,6 +258,7 @@ adb logcat -s Service MockDrama
 - `E:\DSH\work`（反编译出来的旧版源码，用来对照）
 
 删除后若要重新构建，装 Android Studio 或用 `gradle :app:assembleRelease` 即可，项目本身是标准结构。
+
 
 
 

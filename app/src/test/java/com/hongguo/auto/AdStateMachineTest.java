@@ -106,24 +106,58 @@ public class AdStateMachineTest {
     public void continuePromptAfterCountdownGoneSwipes() {
         DetectorConfig config = DetectorConfig.defaults();
         config.cooldownMs = 500;
-        config.endCardConfirmMs = 600;
+        config.endCardConfirmMs = 2500;
         AdStateMachine sm = new AdStateMachine(config);
 
         assertFalse(sm.onScan(adWithPrompt(21), 0).isAction());
         assertFalse(sm.onScan(adWithPrompt(20), 1000).isAction());
-        // 倒计时消失 = 广告播完切结束卡片，但要连续一段时间没有倒计时才动手
+        // 倒计时消失 = 广告播完切结束卡片，但要连续 2.5s 没有倒计时才动手
         assertFalse(sm.onScan(endCard(), 2200).isAction());
-        assertTrue(sm.onScan(endCard(), 2900).swipe);
+        assertFalse(sm.onScan(endCard(), 4000).isAction());
+        assertTrue(sm.onScan(endCard(), 5000).swipe);
     }
 
     @Test
     public void endCardNeedsStableNoCountdown() {
         DetectorConfig config = DetectorConfig.defaults();
         config.cooldownMs = 0;
-        config.endCardConfirmMs = 600;
+        config.endCardConfirmMs = 2500;
         AdStateMachine sm = new AdStateMachine(config);
         assertFalse(sm.onScan(endCard(), 0).isAction());
-        assertTrue(sm.onScan(endCard(), 700).swipe);
+        assertFalse(sm.onScan(endCard(), 700).isAction());
+        assertTrue(sm.onScan(endCard(), 2600).swipe);
+    }
+
+    @Test
+    public void countdownFlickerDoesNotTriggerSwipe() {
+        // 真机日志 01:00:45：广告还有 17s，倒计时节点被裁到屏幕外"消失"了一瞬
+        DetectorConfig config = DetectorConfig.defaults();
+        config.cooldownMs = 600;
+        config.endCardConfirmMs = 2500;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(adWithPrompt(17), 0).isAction());
+        assertFalse(sm.onScan(adWithPrompt(null), 300).isAction());
+        assertFalse(sm.onScan(adWithPrompt(null), 800).isAction());
+        assertFalse(sm.onScan(adWithPrompt(null), 1300).isAction());
+        // 倒计时回来 → 重新计时，绝不上滑
+        assertFalse(sm.onScan(adWithPrompt(16), 1600).isAction());
+        assertFalse(sm.onScan(adWithPrompt(15), 2000).isAction());
+        assertFalse(sm.onScan(adWithPrompt(14), 2600).isAction());
+    }
+
+    @Test
+    public void swipesOnlyAfterAdReallyEnds() {
+        DetectorConfig config = DetectorConfig.defaults();
+        config.cooldownMs = 600;
+        config.endCardConfirmMs = 2500;
+        AdStateMachine sm = new AdStateMachine(config);
+
+        assertFalse(sm.onScan(adWithPrompt(3), 0).isAction());
+        assertFalse(sm.onScan(endCard(), 500).isAction());
+        assertFalse(sm.onScan(endCard(), 1500).isAction());
+        assertFalse(sm.onScan(endCard(), 2900).isAction());
+        assertTrue(sm.onScan(endCard(), 3100).swipe);
     }
 
     @Test
@@ -252,4 +286,5 @@ public class AdStateMachineTest {
         assertTrue(sm.onScan(ad(null), 1600).swipe);
     }
 }
+
 

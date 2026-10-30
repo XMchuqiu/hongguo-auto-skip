@@ -234,7 +234,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="广告角标（或“上滑继续看短剧”）持续这么久没变化、倒计时也停了，就认为广告播完并上滑。倒计时还在走时不会触发。建议 1000–1500ms。"
+            android:text="广告角标（或“上滑继续看短剧”）持续这么久没变化、倒计时也停了，就认为广告播完并上滑。倒计时还在走时不会触发；结束卡片另有一道 2.5 秒的稳定确认，防止广告浮层被裁掉时误判。建议 1000–1500ms。"
             android:textColor="#888888"
             android:textSize="11sp" />
 
@@ -500,3 +500,4 @@
 
     </LinearLayout>
 </ScrollView>
+

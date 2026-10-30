@@ -17,8 +17,12 @@ public final class DetectorConfig {
     public int persistSwipeMs = 1200;
     /** 广告标识至少出现这么久，才允许"广告消失后上滑"，避免闪现误触。 */
     public int minAdDurationMs = 800;
-    /** "上滑继续观看"要连续这么多毫秒都没有倒计时，才当作广告结束卡片（防止倒计时偶尔不渲染导致误判）。 */
-    public int endCardConfirmMs = 600;
+    /**
+     * 结束卡片确认时间：页面上"上滑继续观看" + 没有倒计时，必须持续这么久才动手。
+     * 真机上广告浮层的节点会被裁到屏幕外（bounds 高度为负），倒计时会间歇性"消失"几秒，
+     * 时间太短（如 600ms）会在广告还剩十几秒时误判。
+     */
+    public int endCardConfirmMs = 2500;
     /** 广告超过这么久还跳不过去，就切后台再回来（红果会在回到前台时丢掉广告）。 */
     public int escapeAfterMs = 15000;
     /** 是否允许自动切后台再回来。 */
@@ -87,7 +91,7 @@ public final class DetectorConfig {
         cooldownMs = clampRange(cooldownMs, 600, 20000);
         persistSwipeMs = clampRange(persistSwipeMs, 400, 8000);
         minAdDurationMs = clampRange(minAdDurationMs, 200, 20000);
-        endCardConfirmMs = clampRange(endCardConfirmMs, 200, 3000);
+        endCardConfirmMs = clampRange(endCardConfirmMs, 1000, 8000);
         postSwipeQuietMs = clampRange(postSwipeQuietMs, 0, 30000);
         maxSwipesPerAd = clampRange(maxSwipesPerAd, 1, 10);
         stuckAdMs = clampRange(stuckAdMs, 5000, 180000);
@@ -108,4 +112,5 @@ public final class DetectorConfig {
         return value < min ? min : (value > max ? max : value);
     }
 }
+
 
