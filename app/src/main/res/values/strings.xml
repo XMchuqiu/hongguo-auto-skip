@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">红果自动跳过</string>
+    <string name="accessibility_service_name">红果广告自动跳过服务</string>
+    <string name="accessibility_service_description">自动检测红果免费短剧/红果免费漫剧的广告是否播放完毕，并上滑继续播放下一集。无需 Root，不上传任何数据。</string>
+</resources>

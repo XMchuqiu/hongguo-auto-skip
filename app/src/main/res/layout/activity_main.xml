@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:paddingTop="12dp"
+            android:paddingBottom="4dp"
+            android:text="红果自动跳过"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:paddingBottom="12dp"
+            android:text="广告播完自动上滑，继续看下一集"
+            android:textColor="#888888"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#22888888"
+            android:lineSpacingExtra="4dp"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp"
+            android:textSize="13sp" />
+
+        <Switch
+            android:id="@+id/enable_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:text="启用自动跳过"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Switch
+                android:id="@+id/app_short_switch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:padding="8dp"
+                android:text="红果免费短剧"
+                android:textSize="13sp" />
+
+            <Switch
+                android:id="@+id/app_comic_switch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:padding="8dp"
+                android:text="红果免费漫剧"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/open_accessibility_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            android:text="开启无障碍服务"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:text="参数调节"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/label_swipe_duration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="滑动时长：450 ms"
+            android:textSize="13sp" />
+
+        <SeekBar
+            android:id="@+id/seek_swipe_duration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/label_swipe_from"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="滑动起点：78 %"
+            android:textSize="13sp" />
+
+        <SeekBar
+            android:id="@+id/seek_swipe_from"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/label_swipe_to"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="滑动终点：22 %"
+            android:textSize="13sp" />
+
+        <SeekBar
+            android:id="@+id/seek_swipe_to"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/label_check_interval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="检测间隔：700 ms"
+            android:textSize="13sp" />
+
+        <SeekBar
+            android:id="@+id/seek_check_interval"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/label_cooldown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="防抖冷却：2500 ms"
+            android:textSize="13sp" />
+
+        <SeekBar
+            android:id="@+id/seek_cooldown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/label_persist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="广告结束判定：1200 ms"
+            android:textSize="13sp" />
+
+        <SeekBar
+            android:id="@+id/seek_persist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/reset_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:backgroundTint="#888888"
+            android:text="恢复默认参数"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:text="诊断"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/dump_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="抓取当前页面节点（广告页面时点这里）"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/app_settings_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="打开本应用设置（荣耀/华为：这里允许受限设置）"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/battery_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="电池优化设为不限制"
+            android:textSize="13sp" />
+
+        <Switch
+            android:id="@+id/debug_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:padding="8dp"
+            android:text="保存详细日志"
+            android:textSize="13sp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginBottom="8dp"
+            android:background="#22000000"
+            android:fillViewport="true"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/log_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="暂无日志"
+                android:textColor="#00dd00"
+                android:textSize="11sp" />
+        </ScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/refresh_log_btn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="刷新"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/clear_log_btn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:backgroundTint="#aa3333"
+                android:text="清除"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/export_log_btn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:backgroundTint="#3366aa"
+                android:text="导出"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:text="自定义广告关键词"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/keyword_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="输入广告关键词"
+                android:padding="8dp"
+                android:singleLine="true"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/add_keyword_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#338833"
+                android:text="添加"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/keyword_list_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="#22000000"
+            android:padding="8dp"
+            android:text="暂无自定义关键词"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tips_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:lineSpacingExtra="4dp"
+            android:text="说明\n• 红果免费短剧、红果免费漫剧都支持，可分别开关\n• 检测间隔越短反应越快，但更耗电\n• 广告结束判定：广告标识持续这么久还没变化，就认为播完了，执行上滑\n• 荣耀 MagicOS / 华为鸿蒙：①无障碍开关打不开时，先到「应用设置 → 右上角 ⋮ → 允许受限设置」；②允许「自启动」「后台活动」；③电池优化设为「不限制」。否则无障碍服务会被系统清理\n• 若开启后没反应：点「抓取当前页面节点」，把日志导出后反馈"
+            android:textColor="#888888"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+</ScrollView>
