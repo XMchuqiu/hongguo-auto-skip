@@ -55,6 +55,8 @@ public final class Prefs {
         config.swipeFromPct = clamp(prefs.getInt(KEY_SWIPE_FROM, DEFAULT_SWIPE_FROM), 20, 95);
         config.swipeToPct = clamp(prefs.getInt(KEY_SWIPE_TO, DEFAULT_SWIPE_TO), 5, 60);
         config.customKeywords = splitKeywords(prefs.getString(KEY_KEYWORDS, ""));
+        // 兜底：把非法/危险组合收回合理范围（尤其"起点<终点"会导致往下滑）
+        config.sanitize();
         config.escapeEnabled = prefs.getBoolean(KEY_ESCAPE, true);
         config.escapeAfterMs = clamp(prefs.getInt(KEY_ESCAPE_AFTER, DEFAULT_ESCAPE_AFTER), 5000, 60000);
         return config;
@@ -83,6 +85,12 @@ public final class Prefs {
 
     public static void save(SharedPreferences prefs, int swipeDuration, int fromPct, int toPct,
                             int checkInterval, int cooldown, int persist) {
+        if (fromPct - toPct < 15) {
+            toPct = Math.max(2, fromPct - 15);
+            if (fromPct - toPct < 15) {
+                fromPct = Math.min(95, toPct + 15);
+            }
+        }
         prefs.edit()
                 .putInt(KEY_SWIPE_DURATION, swipeDuration)
                 .putInt(KEY_SWIPE_FROM, fromPct)
@@ -97,4 +105,5 @@ public final class Prefs {
         return value < min ? min : (value > max ? max : value);
     }
 }
+
 

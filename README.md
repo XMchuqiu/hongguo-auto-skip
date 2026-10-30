@@ -1,4 +1,4 @@
-# 红果自动跳过 v2.2（修复版）
+# 红果自动跳过 v2.3（修复版）
 
 通过无障碍服务检测「红果免费短剧」「红果免费漫剧」的广告是否播放完毕，然后自动上滑继续播放，无需 Root。
 
@@ -7,9 +7,33 @@
 
 ## 下载
 
-- 直接安装：[dist/hongguo-auto-skip-v2.2.apk](dist/hongguo-auto-skip-v2.2.apk)（release）
+- 直接安装：[dist/hongguo-auto-skip-v2.3.apk](dist/hongguo-auto-skip-v2.3.apk)（release）
 - 自己编译：`./gradlew :app:assembleRelease`。仓库自带调试签名 `keystore/debug.keystore`（密码 `android`，别名 `androiddebugkey`），
   只为让 clone 下来就能构建，**对外分发请换成你自己的签名**。
+
+## v2.3 修复了什么
+
+真机日志（00:52 那份）里的关键两行：
+
+```
+参数: 间隔=200ms 冷却=500ms 持续=300ms 滑动=155ms 40%->44%
+上滑: 坐标=640,1063->1169
+```
+
+**起点 40%、终点 44% —— 手指是从 1063 往 1169 移动，等于“往下滑”，所以红果回到了上一集。**
+这是我的界面允许了非法组合：终点必须低于起点，否则手势方向反了。
+
+三道防线：
+
+1. **界面**：拖动时自动纠正，起点与终点必须相差 ≥15%，否则把终点拉回起点上方并提示；
+   标签也改成「滑动起点（手指按下位置）」「滑动终点（手指抬起位置）」。
+2. **参数层**：`DetectorConfig.sanitize()` 统一收口（间隔≥300ms、冷却≥600ms、方向差≥15% 等），
+   读配置和保存时都会走一遍，老版本存下来的非法值升级后自动修正。
+3. **手势层**：`performSwipe()` 出手前再校验一次，一旦发现终点在起点下方，直接改成标准的上滑
+   （85%→15%），并写日志说明"参数方向异常"。
+
+另外：**每个设置项下面都加了说明文字**，写清楚它影响什么、建议取值范围、以及容易踩的坑
+（例如终点高于起点会返回上一集、检测间隔 200ms 会很耗电、广告结束判定与倒计时的关系等）。
 
 ## v2.2 修复了什么（基于第二次真机日志）
 
@@ -165,7 +189,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ## 六、验证情况
 
-- `gradle :app:testDebugUnitTest`：**36 个单元测试全部通过**（检测规则 21 + 状态机 15），覆盖漫剧空集数卡片、
+- `gradle :app:testDebugUnitTest`：**40 个单元测试全部通过**（检测规则 21 + 状态机 15 + 参数校验 4），覆盖漫剧空集数卡片、
   短剧广告角标+倒计时+跳过按钮、游戏/应用下载结束卡片、正常播放页面、隐藏节点、多窗口、自定义关键词、
   “倒计时未走完不许滑”、点击跳过、力度升级、结束卡片稳定性确认、广告卡死的切后台兜底、冷却/次数限制等。
 - `gradle :app:assembleDebug/Release`：构建成功；`aapt2 dump badging` 确认包名/权限/无障碍组件；
@@ -189,7 +213,7 @@ gradle :app:assembleDebug             # 产物 app/build/outputs/apk/debug/app-d
 
 ```powershell
 adb install -r .\mockdrama\app\build\outputs\apk\debug\app-debug.apk   # 假红果
-adb install -r .\红果自动跳过-v2.2-debug.apk                          # 本应用
+adb install -r .\红果自动跳过-v2.3-debug.apk                          # 本应用
 adb shell settings put secure enabled_accessibility_services com.hongguo.auto/com.hongguo.auto.HongguoAccessibilityService
 adb shell settings put secure accessibility_enabled 1
 adb shell am start -n com.phoenix.read/.MockActivity
@@ -208,6 +232,7 @@ adb logcat -s Service MockDrama
 - `E:\DSH\work`（反编译出来的旧版源码，用来对照）
 
 删除后若要重新构建，装 Android Studio 或用 `gradle :app:assembleRelease` 即可，项目本身是标准结构。
+
 
 
 

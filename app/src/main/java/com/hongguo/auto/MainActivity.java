@@ -367,8 +367,8 @@ public class MainActivity extends Activity {
 
     private void setupSeekBars() {
         bindSeekBar(seekSwipeDuration, 100, 1000, labelSwipeDuration, "滑动时长：", " ms");
-        bindSeekBar(seekSwipeFrom, 40, 95, labelSwipeFrom, "滑动起点：", " %");
-        bindSeekBar(seekSwipeTo, 5, 60, labelSwipeTo, "滑动终点：", " %");
+        bindSeekBar(seekSwipeFrom, 40, 95, labelSwipeFrom, "滑动起点（手指按下）：", " %");
+        bindSeekBar(seekSwipeTo, 5, 60, labelSwipeTo, "滑动终点（手指抬起）：", " %");
         bindSeekBar(seekCheckInterval, 200, 3000, labelCheckInterval, "检测间隔：", " ms");
         bindSeekBar(seekCooldown, 500, 10000, labelCooldown, "防抖冷却：", " ms");
         bindSeekBar(seekPersist, 300, 5000, labelPersist, "广告结束判定：", " ms");
@@ -383,18 +383,32 @@ public class MainActivity extends Activity {
         seekCooldown.setProgress(config.cooldownMs - 500);
         seekPersist.setProgress(config.persistSwipeMs - 300);
         labelSwipeDuration.setText("滑动时长：" + config.swipeDurationMs + " ms");
-        labelSwipeFrom.setText("滑动起点：" + config.swipeFromPct + " %");
-        labelSwipeTo.setText("滑动终点：" + config.swipeToPct + " %");
+        labelSwipeFrom.setText("滑动起点（手指按下）：" + config.swipeFromPct + " %");
+        labelSwipeTo.setText("滑动终点（手指抬起）：" + config.swipeToPct + " %");
         labelCheckInterval.setText("检测间隔：" + config.checkIntervalMs + " ms");
         labelCooldown.setText("防抖冷却：" + config.cooldownMs + " ms");
         labelPersist.setText("广告结束判定：" + config.persistSwipeMs + " ms");
     }
 
     private void saveFromUi() {
+        int from = seekSwipeFrom.getProgress() + 40;
+        int to = seekSwipeTo.getProgress() + 5;
+        // 起点必须明显高于终点，否则手势会变成"往下滑"（红果会回到上一集）
+        if (from - to < 15) {
+            to = Math.max(5, from - 15);
+            if (from - to < 15) {
+                from = Math.min(95, to + 15);
+                seekSwipeFrom.setProgress(from - 40);
+                labelSwipeFrom.setText("滑动起点（手指按下）：" + from + " %");
+            }
+            seekSwipeTo.setProgress(to - 5);
+            labelSwipeTo.setText("滑动终点（手指抬起）：" + to + " %");
+            toast("起点必须高于终点，已自动把终点调到 " + to + "%");
+        }
         Prefs.save(prefs,
                 seekSwipeDuration.getProgress() + 100,
-                seekSwipeFrom.getProgress() + 40,
-                seekSwipeTo.getProgress() + 5,
+                from,
+                to,
                 seekCheckInterval.getProgress() + 200,
                 seekCooldown.getProgress() + 500,
                 seekPersist.getProgress() + 300);
@@ -692,5 +706,7 @@ public class MainActivity extends Activity {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 }
+
+
 
 

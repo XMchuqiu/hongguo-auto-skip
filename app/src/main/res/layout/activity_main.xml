@@ -33,10 +33,10 @@
             android:id="@+id/status_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
             android:background="#22888888"
             android:lineSpacingExtra="4dp"
             android:padding="12dp"
-            android:layout_marginBottom="12dp"
             android:textSize="13sp" />
 
         <Switch
@@ -46,6 +46,16 @@
             android:padding="12dp"
             android:text="启用自动跳过"
             android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="总开关。关掉后服务仍在运行，但不会点也不会滑。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -71,14 +81,34 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="分别控制两个 App：只对勾选的那个生效，另一个完全不动作。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
+
         <Button
             android:id="@+id/open_accessibility_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="4dp"
             android:text="开启无障碍服务"
             android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="无障碍是这个功能的前提。荣耀/华为如果开关是灰的：先点下方「打开本应用设置」→ 右上角 ⋮ → 允许受限设置。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -98,34 +128,55 @@
         <SeekBar
             android:id="@+id/seek_swipe_duration"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="10dp"
+            android:text="一次上滑手指移动用多久。太短（&lt;200ms）容易被当成快速点击，太长会显得卡。建议 300–600ms。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/label_swipe_from"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="滑动起点：78 %"
+            android:text="滑动起点（手指按下位置）：78 %"
             android:textSize="13sp" />
 
         <SeekBar
             android:id="@+id/seek_swipe_from"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="10dp"
+            android:text="手指按下的位置，按屏幕高度百分比算。默认 78%（靠近屏幕下方）。必须比终点大，否则会变成往下滑、回到上一集。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/label_swipe_to"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="滑动终点：22 %"
+            android:text="滑动终点（手指抬起位置）：22 %"
             android:textSize="13sp" />
 
         <SeekBar
             android:id="@+id/seek_swipe_to"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="10dp"
+            android:text="手指抬起的位置，默认 22%（靠近屏幕上方）。与起点的差值建议 ≥40%，太小可能滑不动；系统会自动保证两者至少差 15%。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/label_check_interval"
@@ -137,8 +188,15 @@
         <SeekBar
             android:id="@+id/seek_check_interval"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="10dp"
+            android:text="多久扫描一次广告页。越小反应越快、越费电。建议 500–1000ms，200ms 会明显耗电。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/label_cooldown"
@@ -150,8 +208,15 @@
         <SeekBar
             android:id="@+id/seek_cooldown"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="10dp"
+            android:text="两次操作之间至少隔多久，防止同一条广告被连点/连滑。建议 2000–3000ms。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/label_persist"
@@ -163,8 +228,15 @@
         <SeekBar
             android:id="@+id/seek_persist"
             android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="12dp"
+            android:text="广告角标（或“上滑继续看短剧”）持续这么久没变化、倒计时也停了，就认为广告播完并上滑。倒计时还在走时不会触发。建议 1000–1500ms。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/reset_btn"
@@ -187,49 +259,97 @@
             android:id="@+id/dump_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="4dp"
             android:text="抓取当前页面节点（广告页面时点这里）"
             android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="点完立刻切回红果的广告页，5 秒后自动抓取；状态区会显示“等待中/已完成”，完成后弹提示并告知窗口数与节点数。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/app_settings_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="4dp"
             android:text="打开本应用设置（荣耀/华为：这里允许受限设置）"
             android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="无障碍开关打不开、或开启后自己关闭，多半是“受限设置”没允许；顺便在这里看权限。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/battery_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="4dp"
             android:text="电池优化设为不限制"
             android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="系统省电会杀掉无障碍服务，表现为“用一会儿就不跳了”。设为“不限制/允许后台活动”最稳。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <Switch
             android:id="@+id/escape_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
             android:padding="8dp"
             android:text="广告卡住时自动切后台再回来"
             android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="广告持续 15 秒还没结束、又找不到跳过按钮时，自动回桌面再打开红果——红果回到前台时会把广告丢掉。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <Switch
             android:id="@+id/debug_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
             android:padding="8dp"
             android:text="保存详细日志"
             android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="把每次检测到的广告特征都写进日志，排错时打开；平时可以关掉，日志更干净。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
 
         <ScrollView
             android:id="@+id/log_scroll"
             android:layout_width="match_parent"
             android:layout_height="200dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="4dp"
             android:background="#22000000"
             android:fillViewport="true"
             android:isScrollContainer="true"
@@ -247,10 +367,20 @@
                 android:textSize="11sp" />
         </ScrollView>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="日志可以在这里直接上下滑动；手指按住时不会自动刷新，松手 8 秒后恢复。"
+            android:textColor="#888888"
+            android:textSize="11sp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
             <Button
@@ -364,11 +494,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:lineSpacingExtra="4dp"
-            android:text="说明\n• 红果免费短剧、红果免费漫剧都支持，可分别开关\n• 检测间隔越短反应越快，但更耗电\n• 广告结束判定：广告标识持续这么久还没变化，就认为播完了，执行上滑\n• 荣耀 MagicOS / 华为鸿蒙：①无障碍开关打不开时，先到「应用设置 → 右上角 ⋮ → 允许受限设置」；②允许「自启动」「后台活动」；③电池优化设为「不限制」。否则无障碍服务会被系统清理\n• 若开启后没反应：点「抓取当前页面节点」，导出后点「打开日志存储位置」把 txt 发出来\n• 日志区域可以直接上下滑动；点「全屏查看日志」能看完整内容\n• 竖屏、横屏、平板/手机各种尺寸都适用，滑动坐标按当前窗口和屏幕自动换算"
+            android:text="其它说明\n• 红果免费短剧、红果免费漫剧都支持，可分别开关\n• 广告播完的判断：倒计时停住/消失，或出现“上滑继续看短剧”\n• 荣耀 MagicOS / 华为鸿蒙：①允许受限设置；②允许自启动、后台活动；③电池优化设为不限制\n• 若开启后没反应：点「抓取当前页面节点」抓一份节点，再点「打开日志存储位置」把 txt 发出来\n• 竖屏、横屏、分屏、平板/手机各种尺寸都适用，坐标按当前窗口与屏幕自动换算"
             android:textColor="#888888"
             android:textSize="12sp" />
 
     </LinearLayout>
 </ScrollView>
-
-

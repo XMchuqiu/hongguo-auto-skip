@@ -362,8 +362,8 @@ public class HongguoAccessibilityService extends AccessibilityService {
         // 广告结束卡片里，中间常常是广告的落地页按钮/WebView，会吃掉手势导致滑不动。
         // 第二次改从底部提示条附近起手，第三次改从视频区中部起手，覆盖不同实现。
         if (variant == 1) {
-            fromPct = 92;
-            toPct = 38;
+            fromPct = 88;
+            toPct = 35;
             duration = Math.max(500, duration);
         } else if (variant >= 2) {
             fromPct = 50;
@@ -377,6 +377,14 @@ public class HongguoAccessibilityService extends AccessibilityService {
         float x = (left + right) / 2f;
         float fromY = top + height * fromPct / 100f;
         float toY = top + height * toPct / 100f;
+
+        // 兜底：无论参数怎么配，都必须"从下往上滑"。一旦发现终点在起点下方，
+        // 强制改成标准上滑，否则红果会把下滑当成"返回上一集"。
+        if (toY > fromY - Math.max(150, height * 0.2f)) {
+            AppLog.d(TAG, "参数方向异常(起点=" + fromPct + "% 终点=" + toPct + "%)，强制改为向上滑");
+            fromY = top + height * 0.85f;
+            toY = top + height * 0.15f;
+        }
 
         Path path = new Path();
         path.moveTo(x, fromY);
@@ -720,6 +728,7 @@ public class HongguoAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 }
+
 
 
 

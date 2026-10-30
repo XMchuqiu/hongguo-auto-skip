@@ -74,7 +74,38 @@ public final class DetectorConfig {
     public String signature() {
         return checkIntervalMs + "|" + cooldownMs + "|" + persistSwipeMs + "|" + minAdDurationMs + "|"
                 + postSwipeQuietMs + "|" + maxSwipesPerAd + "|" + stuckAdMs + "|" + endCardConfirmMs + "|" + escapeAfterMs + "|" + escapeEnabled + "|"
+                + swipeFromPct + "|" + swipeToPct + "|" + swipeDurationMs + "|"
                 + swipeOnAdEnd + "|" + swipeOnPersist + "|" + customKeywords.hashCode();
+    }
+
+    /**
+     * 把参数收进合理范围。最关键的一条：**起点必须明显高于终点**，
+     * 否则手势方向会变成"往下滑"（红果会回到上一集）。
+     */
+    public void sanitize() {
+        checkIntervalMs = clampRange(checkIntervalMs, 300, 5000);
+        cooldownMs = clampRange(cooldownMs, 600, 20000);
+        persistSwipeMs = clampRange(persistSwipeMs, 400, 8000);
+        minAdDurationMs = clampRange(minAdDurationMs, 200, 20000);
+        endCardConfirmMs = clampRange(endCardConfirmMs, 200, 3000);
+        postSwipeQuietMs = clampRange(postSwipeQuietMs, 0, 30000);
+        maxSwipesPerAd = clampRange(maxSwipesPerAd, 1, 10);
+        stuckAdMs = clampRange(stuckAdMs, 5000, 180000);
+        swipeDurationMs = clampRange(swipeDurationMs, 100, 2000);
+        escapeAfterMs = clampRange(escapeAfterMs, 5000, 60000);
+
+        swipeFromPct = clampRange(swipeFromPct, 30, 95);
+        swipeToPct = clampRange(swipeToPct, 2, 70);
+        if (swipeFromPct - swipeToPct < 15) {
+            swipeToPct = Math.max(2, swipeFromPct - 15);
+            if (swipeFromPct - swipeToPct < 15) {
+                swipeFromPct = Math.min(95, swipeToPct + 15);
+            }
+        }
+    }
+
+    private static int clampRange(int value, int min, int max) {
+        return value < min ? min : (value > max ? max : value);
     }
 }
 
