@@ -11,6 +11,11 @@
 - 自己编译：`./gradlew :app:assembleRelease`。仓库自带调试签名 `keystore/debug.keystore`（密码 `android`，别名 `androiddebugkey`），
   只为让 clone 下来就能构建，**对外分发请换成你自己的签名**。
 
+## 开发过程记录
+
+从只有 29 KB 的 APK、反编译出 v1.0，到 v2.5 的完整经过（每一版依据哪条真机日志、根因是什么、
+怎么改、怎么验证、踩过哪些环境坑）：👉 **[docs/devlog.md](docs/devlog.md)**
+
 ## v2.5 新增：持续上滑模式（独立开关）
 
 广告的"播完信号"不可靠时，可以换一种策略：**只要页面还判定为广告，就按固定间隔一直上滑。**
@@ -271,6 +276,7 @@ adb logcat -s Service MockDrama
 - `E:\DSH\work`（反编译出来的旧版源码，用来对照）
 
 删除后若要重新构建，装 Android Studio 或用 `gradle :app:assembleRelease` 即可，项目本身是标准结构。
+
 
 
 
